@@ -6,7 +6,8 @@ import {
   setupFirestoreRealtimeListener, 
   uploadImageToFirebase, 
   deleteImageFromFirebase,
-  renameImageInFirebase
+  renameImageInFirebase,
+  STORAGE_FOLDER_NAME
 } from './firebaseService';
 import { getDemoImages, saveDemoImages, ALL_AVAILABLE_TAGS } from './demoData';
 import { formatFileSize } from './utils';
@@ -34,7 +35,6 @@ import {
   Calendar,
   X
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
 
 export default function App() {
   // Config & State Initialization
@@ -84,7 +84,7 @@ export default function App() {
           );
         } else {
           // Storage Bucket Listing Mode
-          fetchFromStorageBucket(services.storage, 'images')
+          fetchFromStorageBucket(services.storage, STORAGE_FOLDER_NAME)
             .then((fetchedImages) => {
               setImages(fetchedImages);
               setLoading(false);
@@ -132,7 +132,7 @@ export default function App() {
           setError("");
           setLoading(false);
         } else {
-          const fetched = await fetchFromStorageBucket(services.storage, 'images');
+          const fetched = await fetchFromStorageBucket(services.storage, STORAGE_FOLDER_NAME);
           setImages(fetched);
           setLoading(false);
         }
@@ -168,7 +168,7 @@ export default function App() {
       
       // If listing directly from Storage Bucket, re-invoke list to synchronize UI
       if (syncMode === 'storage') {
-        const refreshed = await fetchFromStorageBucket(services.storage, 'images');
+        const refreshed = await fetchFromStorageBucket(services.storage, STORAGE_FOLDER_NAME);
         setImages(refreshed);
       }
     } else {
@@ -214,7 +214,7 @@ export default function App() {
       
       // Sync UI state manually if direct Storage listing
       if (syncMode === 'storage') {
-        const refreshed = await fetchFromStorageBucket(services.storage, 'images');
+        const refreshed = await fetchFromStorageBucket(services.storage, STORAGE_FOLDER_NAME);
         setImages(refreshed);
       }
     } else {
@@ -242,7 +242,7 @@ export default function App() {
       
       // Update local state or trigger a refresh
       if (syncMode === 'storage') {
-        const refreshed = await fetchFromStorageBucket(services.storage, 'images');
+        const refreshed = await fetchFromStorageBucket(services.storage, STORAGE_FOLDER_NAME);
         setImages(refreshed);
       } else {
         // snapshot listener auto-updates but we can instantly update locally for immediate feedback
