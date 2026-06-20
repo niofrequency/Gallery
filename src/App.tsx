@@ -52,46 +52,50 @@ export default function App() {
 
   const isFirebaseActive = isConfigValid(config);
 
-  // ==================== SIMILARITY ENGINE ====================
+  // ==================== SIMILARITY ENGINE (BAG OF WORDS) ====================
   const getSimilarImages = (focus: GalleryImage, allImages: GalleryImage[], limit = 24) => {
     if (!focus) return [];
-    
-    const focusTags = new Set(focus.tags.map(t => t.toLowerCase().trim()));
-    const focusNameWords = focus.name.toLowerCase().split(/\s+/).filter(w => w.length > 3);
-    const focusDesc = (focus.description || "").toLowerCase();
+
+    // Helper to clean and extract useful keywords (ignores tiny words like 'a', 'is')
+    const extractWords = (text: string) => {
+      if (!text) return [];
+      return text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 2);
+    };
+
+    const focusTags = focus.tags ? focus.tags.map(t => t.toLowerCase().trim()) : [];
+    const focusWords = new Set([
+      ...extractWords(focus.name),
+      ...extractWords(focus.description || ""),
+      ...focusTags
+    ]);
 
     return allImages
       .filter(img => img.id !== focus.id)
       .map(img => {
         let score = 0;
-        
-        // 1. Tag matching (strongest signal)
-        const imgTags = img.tags.map(t => t.toLowerCase().trim());
-        const commonTags = imgTags.filter(tag => focusTags.has(tag));
-        score += commonTags.length * 15;
 
-        // 2. Keyword matching in filename
-        const imgName = img.name.toLowerCase();
-        focusNameWords.forEach(word => {
-          if (imgName.includes(word)) score += 8;
+        // 1. Direct Tag Matches (Highest Value)
+        const imgTags = img.tags ? img.tags.map(t => t.toLowerCase().trim()) : [];
+        imgTags.forEach(tag => {
+          if (focusTags.includes(tag)) score += 20;
+          else if (focusWords.has(tag)) score += 10;
         });
 
-        // 3. Description matching
-        if (focusDesc) {
-          const imgDesc = (img.description || "").toLowerCase();
-          if (imgDesc.includes(focusDesc)) score += 6;
-        }
+        // 2. Keyword Matches in Title & Description
+        const imgWords = [
+          ...extractWords(img.name),
+          ...extractWords(img.description || "")
+        ];
 
-        // 4. Bonus for shared long keywords
-        imgTags.forEach(tag => {
-          if (focusNameWords.some(word => tag.includes(word) || word.includes(tag))) {
-            score += 5;
-          }
+        // Score unique shared words
+        const uniqueImgWords = new Set(imgWords);
+        uniqueImgWords.forEach(word => {
+          if (focusWords.has(word)) score += 5;
         });
 
         return { ...img, similarityScore: score };
       })
-      .filter(item => item.similarityScore > 0)
+      .filter(item => item.similarityScore > 0) // Remove items with 0 shared keywords
       .sort((a, b) => b.similarityScore - a.similarityScore)
       .slice(0, limit);
   };
@@ -210,6 +214,7 @@ export default function App() {
       reader.readAsDataURL(file);
       await new Promise<void>((resolve) => {
         reader.onload = () => {
+          const computedRatio = 1.33; // Mock default ratio
           const demoImage: GalleryImage = {
             id: `demo-upload-${Date.now()}`,
             name: metadata.name,
