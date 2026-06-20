@@ -56,10 +56,8 @@ export default function App() {
   const getSimilarImages = (focus: GalleryImage, allImages: GalleryImage[], limit = 24) => {
     if (!focus) return [];
 
-    // Filter out common file extensions and useless connector words
     const STOP_WORDS = new Set(['the', 'and', 'for', 'with', 'this', 'that', 'jpg', 'png', 'jpeg', 'webp', 'img', 'image', 'copy']);
 
-    // Helper to safely clean and extract meaningful words
     const tokenize = (text: string) => {
       if (!text) return [];
       return text.toLowerCase()
@@ -79,16 +77,16 @@ export default function App() {
         const imgTags = img.tags ? img.tags.map(t => t.toLowerCase().trim()) : [];
         const imgWords = tokenize(img.name + " " + (img.description || ""));
 
-        // 1. EXACT Tag Matches (Massive Signal)
+        // 1. EXACT Tag Matches
         imgTags.forEach(tag => {
           if (focusTags.includes(tag)) score += 50; 
         });
 
-        // 2. CROSS-MATCHING (Fixed false positives from short words matching substrings)
+        // 2. CROSS-MATCHING
         imgTags.forEach(tag => {
           focusWords.forEach(w => {
-            if (tag === w) score += 25; // Exact cross-match
-            else if (tag.length > 3 && w.length > 3 && (tag.includes(w) || w.includes(tag))) score += 10; // Safe substring
+            if (tag === w) score += 25; 
+            else if (tag.length > 3 && w.length > 3 && (tag.includes(w) || w.includes(tag))) score += 10; 
           });
         });
         focusTags.forEach(tag => {
@@ -98,16 +96,16 @@ export default function App() {
           });
         });
 
-        // 3. WORD Substring Matches (Title & Description overlapping)
+        // 3. WORD Substring Matches
         const matchedWords = new Set<string>();
         focusWords.forEach(fWord => {
           imgWords.forEach(iWord => {
             if (!matchedWords.has(fWord)) {
               if (fWord === iWord) {
-                score += 15; // Exact word match
+                score += 15; 
                 matchedWords.add(fWord);
               } else if (fWord.length > 3 && iWord.length > 3 && (fWord.includes(iWord) || iWord.includes(fWord))) {
-                score += 5; // Safe partial match
+                score += 5; 
                 matchedWords.add(fWord);
               }
             }
@@ -116,7 +114,8 @@ export default function App() {
 
         return { ...img, similarityScore: score };
       })
-      .filter(item => item.similarityScore > 0) // Must have at least one overlap
+      // CRITICAL TWEAK: Floor threshold raised to 25 to drop low-quality matches
+      .filter(item => item.similarityScore >= 25) 
       .sort((a, b) => b.similarityScore - a.similarityScore)
       .slice(0, limit);
   };
@@ -132,7 +131,6 @@ export default function App() {
         const services = initializeFirebaseServices(config);
         
         if (syncMode === 'firestore') {
-          // Firestore Realtime Sync Mode
           unsubscribe = setupFirestoreRealtimeListener(
             services.firestore,
             'images',
@@ -147,7 +145,6 @@ export default function App() {
             }
           );
         } else {
-          // Storage Bucket Listing Mode
           fetchFromStorageBucket(services.storage, STORAGE_FOLDER_NAME)
             .then((fetchedImages) => {
               setImages(fetchedImages);
@@ -170,7 +167,6 @@ export default function App() {
         setLoading(false);
       }
     } else {
-      // Demo Mode
       const timer = setTimeout(() => {
         setImages(getDemoImages());
         setLoading(false);
@@ -235,7 +231,6 @@ export default function App() {
       reader.readAsDataURL(file);
       await new Promise<void>((resolve) => {
         reader.onload = () => {
-          const computedRatio = 1.33; // Mock default ratio
           const demoImage: GalleryImage = {
             id: `demo-upload-${Date.now()}`,
             name: metadata.name,
@@ -351,7 +346,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-[#E0E0E0] font-sans tracking-tight antialiased selection:bg-orange-500 selection:text-white">
       
-      {/* Sticky Main Header (Full width fluid) */}
+      {/* Sticky Main Header */}
       <header className="sticky top-0 z-30 bg-[#0A0A0A]/95 backdrop-blur-md border-b border-[#222] px-4 sm:px-6 md:px-8 py-5">
         <div className="w-full mx-auto flex items-center justify-between">
           
@@ -369,8 +364,6 @@ export default function App() {
 
           {/* Connection Pill and Action buttons */}
           <div className="flex items-center gap-4">
-            
-            {/* Context Mode Pill Indicator */}
             <div 
               onClick={() => setIsConfigOpen(true)}
               className={`hidden md:flex items-center gap-2.5 bg-[#1A1A1A] px-4 py-2 rounded-none border text-[10px] uppercase font-bold tracking-wider cursor-pointer select-none transition ${
@@ -398,10 +391,9 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Container Workspace (Full width fluid) */}
+      {/* Main Container Workspace */}
       <main className="w-full mx-auto px-4 sm:px-6 md:px-8 py-8 flex flex-col gap-6">
         
-        {/* Connection Failure Error Banner */}
         {error && (
           <div className="p-4 bg-red-950/25 border border-red-900/40 text-red-400 rounded-2xl flex flex-col sm:flex-row gap-3 sm:items-center justify-between text-xs shadow-lg shadow-red-500/5">
             <div className="flex items-start sm:items-center gap-3">
@@ -431,7 +423,6 @@ export default function App() {
         {pinterestFocus ? (
           /* Similarity Detail View */
           <div className="flex flex-col gap-10 animate-in fade-in duration-500">
-            {/* View Header controls */}
             <div className="flex justify-between items-center bg-[#0A0A0A] border border-[#222] p-4">
                <button
                  onClick={() => setPinterestFocus(null)}
@@ -447,7 +438,6 @@ export default function App() {
                </button>
             </div>
 
-            {/* Main Focus Image */}
             <div className="flex justify-center bg-transparent">
               {pinterestFocus.contentType.startsWith("video/") ? (
                 <video src={pinterestFocus.url} className="max-h-[65vh] rounded-2xl shadow-2xl object-contain" controls autoPlay />
@@ -493,7 +483,7 @@ export default function App() {
                     
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/15 transition-colors duration-300" />
                     
-                    {image.similarityScore >= 30 && (
+                    {image.similarityScore >= 45 && (
                       <div className="absolute top-3 right-3 bg-black/70 text-[10px] px-2.5 py-1 rounded-full text-orange-400 font-mono tracking-widest">
                         Strong Match
                       </div>
@@ -503,18 +493,15 @@ export default function App() {
               </div>
               
               {similarImages.length === 0 && (
-                <p className="text-center text-neutral-500 py-12">No similar images found. Try adding more descriptive tags.</p>
+                <p className="text-center text-neutral-500 py-12">No highly similar images found. Try adding matching descriptive names or tags.</p>
               )}
             </div>
           </div>
         ) : (
           /* Main Feed View */
           <>
-            {/* Toolbar and Filters */}
             <div className="bg-[#0A0A0A] border border-[#222] p-6 rounded-none flex flex-col gap-5">
               <div className="flex flex-col xl:flex-row items-center justify-between gap-5">
-                
-                {/* Search Box Input */}
                 <div className="relative w-full xl:max-w-md">
                   <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-500" />
                   <input
@@ -534,10 +521,7 @@ export default function App() {
                   )}
                 </div>
 
-                {/* Layout and Sort Slices */}
                 <div className="flex flex-wrap items-center justify-between w-full xl:w-auto gap-5">
-                  
-                  {/* Sort Selection Controls */}
                   <div className="flex flex-wrap items-center gap-4 text-xs tracking-wider uppercase font-medium text-neutral-400">
                     <span className="text-neutral-500 flex items-center gap-2 font-bold text-[10px] uppercase font-mono tracking-widest"><ArrowUpDown className="w-3.5 h-3.5 text-orange-500" /> Sort</span>
                     
@@ -545,9 +529,7 @@ export default function App() {
                       <button
                         onClick={() => setSortBy('date-desc')}
                         className={`px-3 py-1.5 text-[9px] uppercase tracking-widest font-mono transition cursor-pointer ${
-                          sortBy === 'date-desc' 
-                            ? 'bg-neutral-800 text-orange-500 font-bold' 
-                            : 'text-neutral-400 hover:text-white'
+                          sortBy === 'date-desc' ? 'bg-neutral-800 text-orange-500 font-bold' : 'text-neutral-400 hover:text-white'
                         }`}
                       >
                         Newest
@@ -555,9 +537,7 @@ export default function App() {
                       <button
                         onClick={() => setSortBy('date-asc')}
                         className={`px-3 py-1.5 text-[9px] uppercase tracking-widest font-mono transition cursor-pointer ${
-                          sortBy === 'date-asc' 
-                            ? 'bg-neutral-800 text-orange-500 font-bold' 
-                            : 'text-neutral-400 hover:text-white'
+                          sortBy === 'date-asc' ? 'bg-neutral-800 text-orange-500 font-bold' : 'text-neutral-400 hover:text-white'
                         }`}
                       >
                         Oldest
@@ -568,9 +548,7 @@ export default function App() {
                       <button
                         onClick={() => setSortBy('name-asc')}
                         className={`px-3 py-1.5 text-[9px] uppercase tracking-widest font-mono transition cursor-pointer ${
-                          sortBy === 'name-asc' 
-                            ? 'bg-neutral-800 text-orange-500 font-bold' 
-                            : 'text-neutral-400 hover:text-white'
+                          sortBy === 'name-asc' ? 'bg-neutral-800 text-orange-500 font-bold' : 'text-neutral-400 hover:text-white'
                         }`}
                       >
                         A - Z
@@ -578,9 +556,7 @@ export default function App() {
                       <button
                         onClick={() => setSortBy('name-desc')}
                         className={`px-3 py-1.5 text-[9px] uppercase tracking-widest font-mono transition cursor-pointer ${
-                          sortBy === 'name-desc' 
-                            ? 'bg-neutral-800 text-orange-500 font-bold' 
-                            : 'text-neutral-400 hover:text-white'
+                          sortBy === 'name-desc' ? 'bg-neutral-800 text-orange-500 font-bold' : 'text-neutral-400 hover:text-white'
                         }`}
                       >
                         Z - A
@@ -588,14 +564,11 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Layout Mode Selectors */}
                   <div className="bg-[#0D0D0D] p-1 border border-[#333] flex items-center">
                     <button
                       onClick={() => setLayoutMode('masonry')}
                       className={`p-1.5 px-3 rounded-none text-[10px] uppercase tracking-widest font-semibold flex items-center gap-2 transition select-none ${
-                        layoutMode === 'masonry' 
-                          ? 'bg-neutral-800 text-orange-500 font-bold' 
-                          : 'text-neutral-500 hover:text-white'
+                        layoutMode === 'masonry' ? 'bg-neutral-800 text-orange-500 font-bold' : 'text-neutral-500 hover:text-white'
                       }`}
                       title="Pinterest layout"
                     >
@@ -606,9 +579,7 @@ export default function App() {
                     <button
                       onClick={() => setLayoutMode('grid')}
                       className={`p-1.5 px-3 rounded-none text-[10px] uppercase tracking-widest font-semibold flex items-center gap-2 transition select-none ${
-                        layoutMode === 'grid' 
-                          ? 'bg-neutral-800 text-orange-500 font-bold' 
-                          : 'text-neutral-500 hover:text-white'
+                        layoutMode === 'grid' ? 'bg-neutral-800 text-orange-500 font-bold' : 'text-neutral-500 hover:text-white'
                       }`}
                       title="Strict Grid ratio"
                     >
@@ -619,9 +590,7 @@ export default function App() {
                     <button
                       onClick={() => setLayoutMode('list')}
                       className={`p-1.5 px-3 rounded-none text-[10px] uppercase tracking-widest font-semibold flex items-center gap-2 transition select-none ${
-                        layoutMode === 'list' 
-                          ? 'bg-neutral-800 text-orange-500 font-bold' 
-                          : 'text-neutral-500 hover:text-white'
+                        layoutMode === 'list' ? 'bg-neutral-800 text-orange-500 font-bold' : 'text-neutral-500 hover:text-white'
                       }`}
                       title="Spread list columns"
                     >
@@ -630,7 +599,6 @@ export default function App() {
                     </button>
                   </div>
 
-                  {/* Manual Synchronization Refetch button */}
                   <button
                     onClick={handleRefresh}
                     disabled={loading}
@@ -644,7 +612,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Loading skeletons or active dashboard results */}
             {loading ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 min-[1400px]:grid-cols-5 2xl:grid-cols-6 min-[1800px]:grid-cols-7 gap-3 sm:gap-4 py-6 font-sans w-full">
                 {Array.from({ length: 14 }).map((_, idx) => (
@@ -662,8 +629,6 @@ export default function App() {
                 ))}
               </div>
             ) : filteredAndSortedImages.length === 0 ? (
-              
-              /* Elegant Empty State Illustration */
               <div className="py-24 border border-dashed border-[#333] bg-[#0A0A0A] flex flex-col items-center justify-center text-center gap-5 rounded-none">
                 <div className="p-5 bg-[#0D0D0D] border border-[#222] text-neutral-500 rounded-none">
                   <FolderOpen className="w-8 h-8 text-orange-500" />
@@ -676,9 +641,7 @@ export default function App() {
                 </div>
                 <div className="flex gap-3 text-xs mt-3">
                   <button
-                    onClick={() => {
-                      setSearchQuery("");
-                    }}
+                    onClick={() => setSearchQuery("")}
                     className="px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 rounded-none transition border border-[#333] cursor-pointer font-bold uppercase tracking-widest text-[10px]"
                   >
                     Clear Filters
@@ -692,8 +655,6 @@ export default function App() {
                 </div>
               </div>
             ) : (
-              
-              /* Gallery Results Grid layouts */
               <div className="py-2.5">
                 {layoutMode === 'masonry' && (
                   <div className="columns-2 sm:columns-3 lg:columns-4 min-[1400px]:columns-5 2xl:columns-6 min-[1800px]:columns-7 gap-3 sm:gap-4 w-full">
@@ -737,7 +698,6 @@ export default function App() {
                         onClick={() => handleImageClick(image)}
                         className="relative group rounded-none border border-[#222] bg-[#0A0A0A] overflow-hidden cursor-zoom-in shadow-none transition duration-350 hover:border-neutral-500 aspect-square flex flex-col justify-end"
                       >
-                        {/* Image underlay */}
                         {image.contentType.startsWith("video/") ? (
                           <video
                             src={image.url}
@@ -757,10 +717,8 @@ export default function App() {
                           />
                         )}
 
-                        {/* Uniform gradient drop shadows */}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/25 to-transparent transition-all duration-300 opacity-0 group-hover:opacity-100" />
 
-                        {/* Header values */}
                         <div className="relative p-5 flex flex-col gap-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                           <div className="flex items-center justify-between text-[10px] font-mono text-orange-500 tracking-wider">
                             <span>{formatFileSize(image.size)}</span>
@@ -781,7 +739,6 @@ export default function App() {
                         onClick={() => handleImageClick(image)}
                         className="group rounded-none border border-[#222] bg-[#0A0A0A] p-4 hover:bg-[#151515] hover:border-neutral-700 cursor-zoom-in transition flex gap-5 items-center overflow-hidden"
                       >
-                        {/* Tiny visual thumb preview */}
                         <div className="w-16 h-16 rounded-none overflow-hidden bg-neutral-900 border border-[#222] flex-shrink-0 flex items-center justify-center">
                           {image.contentType.startsWith("video/") ? (
                             <video
@@ -800,7 +757,6 @@ export default function App() {
                           )}
                         </div>
 
-                        {/* Metadata columns */}
                         <div className="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                           <div className="md:col-span-2">
                             <h4 className="text-sm font-medium text-white group-hover:text-orange-400 transition truncate font-sans">{image.name}</h4>
@@ -821,7 +777,6 @@ export default function App() {
         )}
       </main>
 
-      {/* Floating configurations and panels */}
       <FirebaseConfigPanel
         currentConfig={config}
         onConfigChange={(newConfig) => setConfig(newConfig)}
@@ -832,14 +787,12 @@ export default function App() {
         isOpen={isConfigOpen}
       />
 
-      {/* Upload trigger popups */}
       <ImageUploadModal
         isOpen={isUploadOpen}
         onClose={() => setIsUploadOpen(false)}
         onUpload={handleUpload}
       />
 
-      {/* Full-screen Lightbox Details modal */}
       <ImageDetailsModal
         image={selectedImage}
         isOpen={!!selectedImage}
