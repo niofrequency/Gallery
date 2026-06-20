@@ -306,6 +306,32 @@ export default function App() {
       }
     });
 
+  // Calculate masonry grid row spans based on aspect ratio dynamically
+  useEffect(() => {
+    const updateSpans = () => {
+      document.querySelectorAll('.masonry-item').forEach(item => {
+        const img = item.querySelector('img, video') as any;
+        if (img) {
+          // Handle both video and image element properties
+          const height = img.naturalHeight || img.videoHeight || 1.5;
+          const width = img.naturalWidth || img.videoWidth || 1;
+          const ratio = height / width;
+          const span = Math.ceil(ratio * 18); // tweak multiplier
+          (item as HTMLElement).style.setProperty('--span', span.toString());
+        }
+      });
+    };
+
+    // Run after images load or filter updates
+    const timeout = setTimeout(updateSpans, 300);
+    window.addEventListener('resize', updateSpans);
+    
+    return () => {
+      window.removeEventListener('resize', updateSpans);
+      clearTimeout(timeout);
+    };
+  }, [filteredAndSortedImages, layoutMode]);
+
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-[#E0E0E0] font-sans tracking-tight antialiased selection:bg-orange-500 selection:text-white">
       
@@ -608,12 +634,12 @@ export default function App() {
           /* Gallery Results Grid layouts */
           <div className="py-2.5">
             {layoutMode === 'masonry' && (
-              <div className="columns-1 sm:columns-2 md:columns-3 lg:columns-4 gap-5 space-y-5 px-0.5">
+              <div className="masonry-grid grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
                 {filteredAndSortedImages.map((image) => (
                   <div
                      key={image.id}
                      onClick={() => setSelectedImage(image)}
-                     className="break-inside-avoid relative group rounded-none border border-[#222] bg-[#0A0A0A] overflow-hidden cursor-pointer shadow-none transition-all duration-300 hover:border-neutral-500 flex flex-col"
+                     className="masonry-item break-inside-avoid relative group rounded-none border border-[#222] bg-[#0A0A0A] overflow-hidden cursor-pointer shadow-none transition-all duration-300 hover:border-neutral-500 flex flex-col"
                   >
                      
                      {/* Visual Card Media */}
