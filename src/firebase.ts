@@ -1,16 +1,61 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getStorage, FirebaseStorage } from 'firebase/storage';
+import { getStorage, FirebaseStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getFirestore, Firestore } from 'firebase/firestore';
+import { getAnalytics, isSupported } from 'firebase/analytics';
 import { FirebaseConfig } from './types';
 
-// Default / fallback blank config that the user can override via .env/UI
+// Your exact web app Firebase configuration
 export const DEFAULT_BLANK_CONFIG: FirebaseConfig = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: ""
+  apiKey: "AIzaSyBy7maWYwB7fKfqPs4x2Hwv1yhPeeuk8Yc",
+  authDomain: "arx-207a2.firebaseapp.com",
+  projectId: "arx-207a2",
+  storageBucket: "arx-207a2.firebasestorage.app",
+  messagingSenderId: "633149834764",
+  appId: "1:633149834764:web:3145ed0024bd9ee3c31029",
+  measurementId: "G-7JX9KDD740"
+};
+
+// Initialize default Firebase App
+const defaultApp = getApps().length === 0 ? initializeApp(DEFAULT_BLANK_CONFIG) : getApp();
+
+// Safely initialize analytics (prevents crashes in environments that block it)
+isSupported().then(supported => {
+  if (supported) {
+    getAnalytics(defaultApp);
+  }
+});
+
+// Initialize Storage
+export const storage = getStorage(defaultApp);
+
+/**
+ * Uploads a Blob (Image or Video) to Firebase Storage and returns the public download URL.
+ * 
+ * @param fileBlob The raw Blob data of the generated asset.
+ * @param storagePath The path in your bucket (e.g., 'outputs/12345.mp4')
+ * @returns The permanent Firebase HTTP Download URL
+ */
+export const uploadToFirebase = async (fileBlob: Blob, storagePath: string): Promise<string> => {
+  try {
+    // Create a reference to the specific path in your bucket
+    const storageRef = ref(storage, storagePath);
+
+    // Upload the blob
+    await uploadBytes(storageRef, fileBlob);
+
+    // Fetch and return the public download URL
+    const downloadUrl = await getDownloadURL(storageRef);
+    return downloadUrl;
+    
+  } catch (error) {
+    console.error("Firebase Upload Error:", error);
+    throw new Error("Failed to upload the generated asset to Firebase Cloud Storage.");
+  }
 };
 
 // Check if variables exist in VITE_ environment variables
@@ -21,7 +66,8 @@ const loadEnvConfig = (): FirebaseConfig => {
     projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "",
     storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "",
     messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
-    appId: import.meta.env.VITE_FIREBASE_APP_ID || ""
+    appId: import.meta.env.VITE_FIREBASE_APP_ID || "",
+    measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || ""
   };
 };
 
@@ -70,6 +116,20 @@ export const initializeFirebaseServices = (config: FirebaseConfig) => {
   }
 
   const configStr = JSON.stringify(config);
+  
+  // If config matches DEFAULT_BLANK_CONFIG, we can use the defaultApp directly instead of creating a named one
+  if (configStr === JSON.stringify(DEFAULT_BLANK_CONFIG)) {
+    initializedApp = defaultApp;
+    initializedStorage = storage;
+    initializedFirestore = getFirestore(defaultApp);
+    lastUsedConfigString = configStr;
+    
+    return {
+      app: initializedApp!,
+      storage: initializedStorage!,
+      firestore: initializedFirestore!
+    };
+  }
   
   // If config changed, re-initialize or retrieve apps
   if (configStr !== lastUsedConfigString) {
