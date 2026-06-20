@@ -52,26 +52,18 @@ export default function App() {
 
   const isFirebaseActive = isConfigValid(config);
 
-  // ==================== SIMILARITY ENGINE V5 (PRO ALGORITHM) ====================
+  // ==================== SIMILARITY ENGINE (FUZZY & CROSS-FIELD) ====================
   const getSimilarImages = (focus: GalleryImage, allImages: GalleryImage[], limit = 24) => {
     if (!focus) return [];
 
+    // Helper to safely clean and extract meaningful words (allows 2-letter words like "3D", "AI")
     const tokenize = (text: string) => {
       if (!text) return [];
       return text.toLowerCase().replace(/[^a-z0-9]/g, ' ').split(/\s+/).filter(w => w.length > 1);
     };
 
-    // Create 2-word combinations for exact phrase matching (e.g. "pink hair")
-    const getBigrams = (words: string[]) => {
-      return words.map((w, i) => i < words.length - 1 ? `${w} ${words[i+1]}` : null).filter(Boolean) as string[];
-    };
-
     const focusTags = focus.tags ? focus.tags.map(t => t.toLowerCase().trim()) : [];
-    const focusNameWords = tokenize(focus.name);
-    const focusDescWords = tokenize(focus.description || "");
-    const focusAllWords = [...focusNameWords, ...focusDescWords, ...focusTags];
-    
-    const focusBigrams = new Set([...getBigrams(focusNameWords), ...getBigrams(focusDescWords)]);
+    const focusWords = tokenize(focus.name + " " + (focus.description || ""));
 
     return allImages
       .filter(img => img.id !== focus.id)
@@ -79,65 +71,37 @@ export default function App() {
         let score = 0;
 
         const imgTags = img.tags ? img.tags.map(t => t.toLowerCase().trim()) : [];
-        const imgNameWords = tokenize(img.name);
-        const imgDescWords = tokenize(img.description || "");
-        const imgAllWords = [...imgNameWords, ...imgDescWords, ...imgTags];
-        const imgBigrams = [...getBigrams(imgNameWords), ...getBigrams(imgDescWords)];
+        const imgWords = tokenize(img.name + " " + (img.description || ""));
 
         // 1. EXACT Tag Matches (Massive Signal)
         imgTags.forEach(tag => {
           if (focusTags.includes(tag)) score += 50; 
         });
 
-        // 2. Exact Phrase Matches (e.g. "pink hair" appears consecutively in both)
-        imgBigrams.forEach(bg => {
-          if (focusBigrams.has(bg)) score += 40;
+        // 2. CROSS-MATCHING: Do the Focus Tags exist in the Image Title/Desc? (and vice versa)
+        imgTags.forEach(tag => {
+          // e.g., Tag "pink" matches title word "pinkhaired"
+          if (focusWords.some(w => tag.includes(w) || w.includes(tag))) score += 20;
+        });
+        focusTags.forEach(tag => {
+          if (imgWords.some(w => tag.includes(w) || w.includes(tag))) score += 20;
         });
 
-        // 3. Weighted Word Matching
+        // 3. WORD Substring Matches (Title & Description overlapping)
         const matchedWords = new Set<string>();
-        
-        // High Value: Title to Title / Title to Anywhere
-        imgNameWords.forEach(iWord => {
-          if (focusNameWords.includes(iWord) && !matchedWords.has(iWord)) {
-             score += 20; // Exact title-to-title match
-             matchedWords.add(iWord);
-          } else if (focusAllWords.includes(iWord) && !matchedWords.has(iWord)) {
-             score += 15; // Title word found elsewhere
-             matchedWords.add(iWord);
-          }
-        });
-
-        // Medium/Low Value: General Description and Partial Matches
-        imgAllWords.forEach(iWord => {
-          if (!matchedWords.has(iWord)) {
-            if (focusAllWords.includes(iWord)) {
-              score += 10; // Exact word match anywhere
-              matchedWords.add(iWord);
-            } else if (focusAllWords.some(fWord => fWord.includes(iWord) || iWord.includes(fWord))) {
-              score += 5; // Partial substring match (e.g., "blonde" vs "blondes")
-              matchedWords.add(iWord);
+        focusWords.forEach(fWord => {
+          imgWords.forEach(iWord => {
+            // Check for overlap without double counting
+            if (!matchedWords.has(fWord) && (fWord.includes(iWord) || iWord.includes(fWord))) {
+              score += 10;
+              matchedWords.add(fWord);
             }
-          }
+          });
         });
-
-        // 4. Structural & Format Pairing
-        const focusMediaType = focus.contentType.split('/')[0];
-        const imgMediaType = img.contentType.split('/')[0];
-        if (imgMediaType === focusMediaType) {
-          score += 5; // Both are video or both are image
-        }
-        
-        // Approximate shape matching
-        if (img.aspectRatio && focus.aspectRatio) {
-          const isImgWide = img.aspectRatio > 1.1;
-          const isFocusWide = focus.aspectRatio > 1.1;
-          if (isImgWide === isFocusWide) score += 5;
-        }
 
         return { ...img, similarityScore: score };
       })
-      .filter(item => item.similarityScore > 0) // Remove totally unrelated items
+      .filter(item => item.similarityScore > 0) // Must have at least one fuzzy overlap
       .sort((a, b) => b.similarityScore - a.similarityScore)
       .slice(0, limit);
   };
@@ -514,7 +478,7 @@ export default function App() {
                     
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/15 transition-colors duration-300" />
                     
-                    {image.similarityScore >= 35 && (
+                    {image.similarityScore >= 30 && (
                       <div className="absolute top-3 right-3 bg-black/70 text-[10px] px-2.5 py-1 rounded-full text-orange-400 font-mono tracking-widest">
                         Strong Match
                       </div>
