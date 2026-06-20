@@ -9,7 +9,7 @@ import {
   renameImageInFirebase,
   STORAGE_FOLDER_NAME
 } from './firebaseService';
-import { getDemoImages, saveDemoImages, ALL_AVAILABLE_TAGS } from './demoData';
+import { getDemoImages, saveDemoImages } from './demoData';
 import { formatFileSize } from './utils';
 
 // Components
@@ -47,7 +47,6 @@ export default function App() {
   
   // Filtering & Sorting State
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [layoutMode, setLayoutMode] = useState<LayoutMode>('masonry');
   const [sortBy, setSortBy] = useState<string>('date-desc');
 
@@ -262,25 +261,12 @@ export default function App() {
     setPinterestFocus(prev => prev && prev.id === image.id ? { ...prev, name: cleanName } : prev);
   };
 
-  // Toggle active filters
-  const handleTagToggle = (tag: string) => {
-    setSelectedTags(prev => 
-      prev.includes(tag) 
-        ? prev.filter(t => t !== tag) 
-        : [...prev, tag]
-    );
-  };
-
-  const handleClearAllTags = () => {
-    setSelectedTags([]);
-  };
-
   const handleImageClick = (image: GalleryImage) => {
     setPinterestFocus(image);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Perform client side search and categorization checks
+  // Perform client side search
   const filteredAndSortedImages = images
     .filter(img => {
       // Search Box Filter
@@ -289,11 +275,7 @@ export default function App() {
         img.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
         img.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()));
 
-      // Tag Pushes Filter
-      const matchesTags = selectedTags.length === 0 || 
-        selectedTags.every(t => img.tags.includes(t));
-
-      return matchesSearch && matchesTags;
+      return matchesSearch;
     })
     .sort((a, b) => {
       // Dynamic Sorting
@@ -578,40 +560,6 @@ export default function App() {
                   </button>
                 </div>
               </div>
-
-              {/* Interactive filter pills category box */}
-              <div className="flex flex-col gap-3 pt-3.5 border-t border-[#222]">
-                <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.25em] font-bold text-neutral-500">
-                  <span>Filter by Classifications</span>
-                  {selectedTags.length > 0 && (
-                    <button
-                      onClick={handleClearAllTags}
-                      className="text-orange-500 hover:text-white tracking-widest font-bold uppercase transition"
-                    >
-                      Clear active tags ({selectedTags.length})
-                    </button>
-                  )}
-                </div>
-                
-                <div className="flex flex-wrap gap-2.5">
-                  {ALL_AVAILABLE_TAGS.map(tag => {
-                    const isSelected = selectedTags.includes(tag);
-                    return (
-                      <button
-                        key={tag}
-                        onClick={() => handleTagToggle(tag)}
-                        className={`text-[9px] uppercase tracking-widest px-3 py-1.5 rounded-none font-semibold transition ${
-                          isSelected 
-                            ? 'bg-orange-500/10 text-orange-400 border border-orange-500/45' 
-                            : 'bg-[#0D0D0D] hover:bg-neutral-800 text-neutral-400 border border-[#333]'
-                        }`}
-                      >
-                        {tag}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
             </div>
 
             {/* Loading skeletons or active dashboard results */}
@@ -648,7 +596,6 @@ export default function App() {
                   <button
                     onClick={() => {
                       setSearchQuery("");
-                      setSelectedTags([]);
                     }}
                     className="px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 rounded-none transition border border-[#333] cursor-pointer font-bold uppercase tracking-widest text-[10px]"
                   >
@@ -818,7 +765,7 @@ export default function App() {
         onClose={() => setSelectedImage(null)}
         onDelete={handleDelete}
         onRename={handleRename}
-        onTagClick={(tag) => setSelectedTags([tag])}
+        onTagClick={() => {}}
       />
     </div>
   );
