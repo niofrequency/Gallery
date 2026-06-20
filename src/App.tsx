@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { GalleryImage, FirebaseConfig, LayoutMode } from './types';
 import { getStoredConfig, isConfigValid, initializeFirebaseServices } from './firebase';
 import { 
@@ -82,7 +82,7 @@ export default function App() {
           if (imgDesc.includes(focusDesc)) score += 6;
         }
 
-        // 4. Bonus for shared long keywords (e.g. "pink", "hair", "tattoo", etc.)
+        // 4. Bonus for shared long keywords
         imgTags.forEach(tag => {
           if (focusNameWords.some(word => tag.includes(word) || word.includes(tag))) {
             score += 5;
@@ -91,7 +91,7 @@ export default function App() {
 
         return { ...img, similarityScore: score };
       })
-      .filter(item => item.similarityScore > 0) // Only return items with at least some match
+      .filter(item => item.similarityScore > 0)
       .sort((a, b) => b.similarityScore - a.similarityScore)
       .slice(0, limit);
   };
@@ -117,7 +117,7 @@ export default function App() {
               setError("");
             },
             (err) => {
-              setError(err.message || "Failed to establish Firestore real-time listener. Verify firestore.rules and custom collections.");
+              setError(err.message || "Failed to establish Firestore real-time listener.");
               setLoading(false);
             }
           );
@@ -130,12 +130,11 @@ export default function App() {
               setError("");
             })
             .catch((err) => {
-              setError(err.message || "Failed to list Firebase storage folders. Check your storage.rules or CORS configuration.");
+              setError(err.message || "Failed to list Firebase storage folders.");
               setLoading(false);
             });
         }
       } catch (err: any) {
-        // Extract inner error message if JSON encoded
         let visibleError = err?.message || String(err);
         try {
           const parsed = JSON.parse(visibleError);
@@ -167,7 +166,6 @@ export default function App() {
       try {
         const services = initializeFirebaseServices(config);
         if (syncMode === 'firestore') {
-          // Firestore refresh (redundant but confirms connection)
           setError("");
           setLoading(false);
         } else {
@@ -200,23 +198,18 @@ export default function App() {
         file,
         metadata,
         syncMode === 'firestore',
-        (progress) => {
-          // Progress is beautifully handled inside the modal via local hooks
-        }
+        (progress) => {}
       );
       
-      // If listing directly from Storage Bucket, re-invoke list to synchronize UI
       if (syncMode === 'storage') {
         const refreshed = await fetchFromStorageBucket(services.storage, STORAGE_FOLDER_NAME);
         setImages(refreshed);
       }
     } else {
-      // Demo Mode simulated upload
       const reader = new FileReader();
       reader.readAsDataURL(file);
       await new Promise<void>((resolve) => {
         reader.onload = () => {
-          const computedRatio = 1.33; // Mock default ratio
           const demoImage: GalleryImage = {
             id: `demo-upload-${Date.now()}`,
             name: metadata.name,
@@ -227,7 +220,7 @@ export default function App() {
             createdAt: Date.now(),
             tags: metadata.tags,
             description: metadata.description,
-            aspectRatio: computedRatio
+            aspectRatio: 1.33
           };
 
           const existingDemo = getDemoImages();
@@ -251,19 +244,16 @@ export default function App() {
         syncMode === 'firestore'
       );
       
-      // Sync UI state manually if direct Storage listing
       if (syncMode === 'storage') {
         const refreshed = await fetchFromStorageBucket(services.storage, STORAGE_FOLDER_NAME);
         setImages(refreshed);
       }
     } else {
-      // Demo Mode Delete
       const filtered = getDemoImages().filter(img => img.id !== image.id);
       saveDemoImages(filtered);
       setImages(filtered);
     }
     
-    // Clear views if deleted
     if (pinterestFocus?.id === image.id) setPinterestFocus(null);
     if (selectedImage?.id === image.id) setSelectedImage(null);
   };
@@ -283,16 +273,13 @@ export default function App() {
         syncMode === 'firestore'
       );
       
-      // Update local state or trigger a refresh
       if (syncMode === 'storage') {
         const refreshed = await fetchFromStorageBucket(services.storage, STORAGE_FOLDER_NAME);
         setImages(refreshed);
       } else {
-        // snapshot listener auto-updates but we can instantly update locally for immediate feedback
         setImages(prev => prev.map(img => img.id === image.id ? { ...img, name: cleanName } : img));
       }
     } else {
-      // Demo Mode Rename
       const updated = getDemoImages().map(img => 
         img.id === image.id ? { ...img, name: cleanName } : img
       );
@@ -300,7 +287,6 @@ export default function App() {
       setImages(updated);
     }
 
-    // Update state objects to prevent visual lag
     setSelectedImage(prev => prev && prev.id === image.id ? { ...prev, name: cleanName } : prev);
     setPinterestFocus(prev => prev && prev.id === image.id ? { ...prev, name: cleanName } : prev);
   };
@@ -313,7 +299,6 @@ export default function App() {
   // Perform client side search
   const filteredAndSortedImages = images
     .filter(img => {
-      // Search Box Filter
       const matchesSearch = searchQuery.trim() === "" || 
         img.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         img.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -322,21 +307,20 @@ export default function App() {
       return matchesSearch;
     })
     .sort((a, b) => {
-      // Dynamic Sorting
       switch (sortBy) {
-        case 'date-asc':
-          return a.createdAt - b.createdAt;
-        case 'name-asc':
-          return a.name.localeCompare(b.name);
-        case 'name-desc':
-          return b.name.localeCompare(a.name);
-        case 'size-desc':
-          return b.size - a.size;
+        case 'date-asc': return a.createdAt - b.createdAt;
+        case 'name-asc': return a.name.localeCompare(b.name);
+        case 'name-desc': return b.name.localeCompare(a.name);
+        case 'size-desc': return b.size - a.size;
         case 'date-desc':
-        default:
-          return b.createdAt - a.createdAt;
+        default: return b.createdAt - a.createdAt;
       }
     });
+
+  // Memoized similar images for better performance
+  const similarImages = useMemo(() => {
+    return pinterestFocus ? getSimilarImages(pinterestFocus, images, 24) : [];
+  }, [pinterestFocus, images]);
 
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-[#E0E0E0] font-sans tracking-tight antialiased selection:bg-orange-500 selection:text-white">
@@ -457,7 +441,7 @@ export default function App() {
                 </p>
               </div>
               <div className="columns-2 sm:columns-3 lg:columns-4 min-[1400px]:columns-5 2xl:columns-6 min-[1800px]:columns-7 gap-3 sm:gap-4 w-full">
-                {getSimilarImages(pinterestFocus, images).map((image: any) => (
+                {similarImages.map((image: any) => (
                   <div
                     key={image.id}
                     onClick={() => handleImageClick(image)}
@@ -483,7 +467,6 @@ export default function App() {
                     
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/15 transition-colors duration-300" />
                     
-                    {/* Show match strength */}
                     {image.similarityScore > 15 && (
                       <div className="absolute top-3 right-3 bg-black/70 text-[10px] px-2.5 py-1 rounded-full text-orange-400 font-mono tracking-widest">
                         Strong Match
@@ -493,9 +476,8 @@ export default function App() {
                 ))}
               </div>
               
-              {/* Fallback message if no good matches */}
-              {getSimilarImages(pinterestFocus, images).length === 0 && (
-                <p className="text-center text-neutral-500 py-12">No similar images found.</p>
+              {similarImages.length === 0 && (
+                <p className="text-center text-neutral-500 py-12">No similar images found. Try adding more descriptive tags.</p>
               )}
             </div>
           </div>
