@@ -548,7 +548,7 @@ export default function App() {
 
         {/* Loading skeletons or active dashboard results */}
         {loading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6 min-[1800px]:grid-cols-7 gap-3 sm:gap-4 py-6 font-sans w-full">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 min-[1400px]:grid-cols-5 2xl:grid-cols-6 min-[1800px]:grid-cols-7 gap-3 sm:gap-4 py-6 font-sans w-full">
             {Array.from({ length: 14 }).map((_, idx) => (
               <div 
                 key={idx} 
@@ -599,7 +599,6 @@ export default function App() {
           /* Gallery Results Grid layouts */
           <div className="py-2.5">
             {layoutMode === 'masonry' && (
-              {/* Responsive columns matching exact Pinterest scaling */}
               <div className="columns-2 sm:columns-3 lg:columns-4 min-[1400px]:columns-5 2xl:columns-6 min-[1800px]:columns-7 gap-3 sm:gap-4 w-full">
                 {filteredAndSortedImages.map((image) => (
                   <div
@@ -626,7 +625,6 @@ export default function App() {
                            referrerPolicy="no-referrer"
                          />
                        )}
-                       {/* Pinterest style inner gradient and info */}
                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-5">
                          <p className="text-[10px] font-bold text-orange-400 uppercase tracking-[0.2em] mb-1 font-mono">{formatFileSize(image.size)}</p>
                          <p className="text-[10px] text-neutral-200 tracking-wider font-mono uppercase">View details</p>
