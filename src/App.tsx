@@ -304,9 +304,9 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-[#E0E0E0] font-sans tracking-tight antialiased selection:bg-orange-500 selection:text-white">
       
-      {/* Sticky Main Header */}
-      <header className="sticky top-0 z-30 bg-[#0A0A0A]/95 backdrop-blur-md border-b border-[#222] px-6 py-5">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
+      {/* Sticky Main Header (Full width fluid) */}
+      <header className="sticky top-0 z-30 bg-[#0A0A0A]/95 backdrop-blur-md border-b border-[#222] px-4 sm:px-6 md:px-8 py-5">
+        <div className="w-full mx-auto flex items-center justify-between">
           
           {/* Logo Brand Title */}
           <div className="flex items-center gap-4">
@@ -348,8 +348,8 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Container Workspace */}
-      <main className="max-w-7xl mx-auto px-6 py-8 flex flex-col gap-6">
+      {/* Main Container Workspace (Full width fluid) */}
+      <main className="w-full mx-auto px-4 sm:px-6 md:px-8 py-8 flex flex-col gap-6">
         
         {/* Connection Failure Error Banner */}
         {error && (
@@ -380,10 +380,10 @@ export default function App() {
 
         {/* Toolbar Toolbar and Filters */}
         <div className="bg-[#0A0A0A] border border-[#222] p-6 rounded-none flex flex-col gap-5">
-          <div className="flex flex-col lg:flex-row items-center justify-between gap-5">
+          <div className="flex flex-col xl:flex-row items-center justify-between gap-5">
             
             {/* Search Box Input */}
-            <div className="relative w-full lg:max-w-md">
+            <div className="relative w-full xl:max-w-md">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-500" />
               <input
                 type="text"
@@ -403,7 +403,7 @@ export default function App() {
             </div>
 
             {/* Layout and Sort Slices */}
-            <div className="flex flex-wrap items-center justify-between w-full lg:w-auto gap-5">
+            <div className="flex flex-wrap items-center justify-between w-full xl:w-auto gap-5">
               
               {/* Sort Selection Clickable Controls */}
               <div className="flex flex-wrap items-center gap-4 text-xs tracking-wider uppercase font-medium text-neutral-400">
@@ -548,8 +548,8 @@ export default function App() {
 
         {/* Loading skeletons or active dashboard results */}
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 py-6 font-sans w-full">
-            {Array.from({ length: 6 }).map((_, idx) => (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6 min-[1800px]:grid-cols-7 gap-3 sm:gap-4 py-6 font-sans w-full">
+            {Array.from({ length: 14 }).map((_, idx) => (
               <div 
                 key={idx} 
                 className="bg-[#0A0A0A] border border-[#222] rounded-none h-[280px] w-full flex flex-col gap-4 p-4 overflow-hidden animate-pulse"
@@ -599,12 +599,13 @@ export default function App() {
           /* Gallery Results Grid layouts */
           <div className="py-2.5">
             {layoutMode === 'masonry' && (
-              <div className="columns-1 sm:columns-2 md:columns-3 gap-3 w-full">
+              {/* Responsive columns matching exact Pinterest scaling */}
+              <div className="columns-2 sm:columns-3 lg:columns-4 min-[1400px]:columns-5 2xl:columns-6 min-[1800px]:columns-7 gap-3 sm:gap-4 w-full">
                 {filteredAndSortedImages.map((image) => (
                   <div
                      key={image.id}
                      onClick={() => setSelectedImage(image)}
-                     className="break-inside-avoid mb-3 relative group rounded-2xl border border-[#222] bg-[#0A0A0A] overflow-hidden cursor-pointer shadow-none transition-all duration-300 hover:border-neutral-500 flex flex-col hover:shadow-[0_8px_30px_rgb(0,0,0,0.5)] hover:-translate-y-1"
+                     className="break-inside-avoid mb-3 sm:mb-4 relative group rounded-2xl border border-[#222] bg-[#0A0A0A] overflow-hidden cursor-pointer shadow-none transition-all duration-300 hover:border-neutral-500 flex flex-col hover:shadow-[0_8px_30px_rgb(0,0,0,0.5)] hover:-translate-y-1"
                   >
                      <div className="relative overflow-hidden w-full bg-neutral-900">
                        {image.contentType.startsWith("video/") ? (
@@ -637,7 +638,7 @@ export default function App() {
             )}
 
             {layoutMode === 'grid' && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 w-full">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 min-[1400px]:grid-cols-5 2xl:grid-cols-6 min-[1800px]:grid-cols-7 gap-3 sm:gap-4 w-full">
                 {filteredAndSortedImages.map((image) => (
                   <div
                     key={image.id}
@@ -681,7 +682,7 @@ export default function App() {
             )}
 
             {layoutMode === 'list' && (
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-3.5">
                 {filteredAndSortedImages.map((image) => (
                   <div
                     key={image.id}
