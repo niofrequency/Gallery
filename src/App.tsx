@@ -548,8 +548,8 @@ export default function App() {
 
         {/* Loading skeletons or active dashboard results */}
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 py-6 font-sans">
-            {Array.from({ length: 8 }).map((_, idx) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 py-6 font-sans w-full">
+            {Array.from({ length: 6 }).map((_, idx) => (
               <div 
                 key={idx} 
                 className="bg-[#0A0A0A] border border-[#222] rounded-none h-[280px] w-full flex flex-col gap-4 p-4 overflow-hidden animate-pulse"
@@ -599,12 +599,12 @@ export default function App() {
           /* Gallery Results Grid layouts */
           <div className="py-2.5">
             {layoutMode === 'masonry' && (
-              <div className="columns-2 md:columns-3 gap-2.5 sm:gap-3 w-full">
+              <div className="columns-1 sm:columns-2 md:columns-3 gap-3 w-full">
                 {filteredAndSortedImages.map((image) => (
                   <div
                      key={image.id}
                      onClick={() => setSelectedImage(image)}
-                     className="break-inside-avoid mb-2.5 sm:mb-3 relative group rounded-2xl border border-[#222] bg-[#0A0A0A] overflow-hidden cursor-pointer shadow-none transition-all duration-300 hover:border-neutral-500 flex flex-col hover:shadow-[0_8px_30px_rgb(0,0,0,0.5)] hover:-translate-y-1"
+                     className="break-inside-avoid mb-3 relative group rounded-2xl border border-[#222] bg-[#0A0A0A] overflow-hidden cursor-pointer shadow-none transition-all duration-300 hover:border-neutral-500 flex flex-col hover:shadow-[0_8px_30px_rgb(0,0,0,0.5)] hover:-translate-y-1"
                   >
                      <div className="relative overflow-hidden w-full bg-neutral-900">
                        {image.contentType.startsWith("video/") ? (
@@ -637,7 +637,7 @@ export default function App() {
             )}
 
             {layoutMode === 'grid' && (
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 sm:gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 w-full">
                 {filteredAndSortedImages.map((image) => (
                   <div
                     key={image.id}
@@ -681,7 +681,7 @@ export default function App() {
             )}
 
             {layoutMode === 'list' && (
-              <div className="flex flex-col gap-3.5">
+              <div className="flex flex-col gap-3">
                 {filteredAndSortedImages.map((image) => (
                   <div
                     key={image.id}
