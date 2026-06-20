@@ -21,6 +21,15 @@ import {
 } from 'firebase/firestore';
 import { GalleryImage } from './types';
 
+// ==========================================
+// 📁 DIRECTORY CONFIGURATION 
+// ==========================================
+// CHANGE THIS string to exactly match the folder name in your Firebase screenshot!
+// Example: If your folder is named "Uploads", change it to "Uploads"
+// Example: If your files are in the root, change it to ""
+export const STORAGE_FOLDER_NAME = "images";
+// ==========================================
+
 export enum OperationType {
   CREATE = 'create',
   UPDATE = 'update',
@@ -67,7 +76,7 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
  */
 export async function fetchFromStorageBucket(
   storage: FirebaseStorage, 
-  folderPath = "images"
+  folderPath = STORAGE_FOLDER_NAME
 ): Promise<GalleryImage[]> {
   try {
     // List elements from both the subfolder path and the root bucket
@@ -193,7 +202,7 @@ export function uploadImageToFirebase(
   return new Promise((resolve, reject) => {
     // Generate a unique filename using timestamp
     const cleanFileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, "_")}`;
-    const storagePath = `images/${cleanFileName}`;
+    const storagePath = STORAGE_FOLDER_NAME ? `${STORAGE_FOLDER_NAME}/${cleanFileName}` : cleanFileName;
     const storageRef = ref(storage, storagePath);
 
     // Calculate approximate image aspect ratio using a temporary client-side Image object
