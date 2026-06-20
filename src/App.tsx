@@ -25,14 +25,9 @@ import {
   Columns, 
   List, 
   ArrowUpDown, 
-  Wifi, 
-  CloudOff, 
-  Image as ImageIcon,
   AlertCircle,
-  FileImage,
   RefreshCw,
   FolderOpen,
-  Calendar,
   X
 } from 'lucide-react';
 
@@ -155,7 +150,7 @@ export default function App() {
   ) => {
     if (isFirebaseActive) {
       const services = initializeFirebaseServices(config);
-      const newImage = await uploadImageToFirebase(
+      await uploadImageToFirebase(
         services.storage,
         services.firestore,
         file,
@@ -306,32 +301,6 @@ export default function App() {
       }
     });
 
-  // Calculate masonry grid row spans based on aspect ratio dynamically
-  useEffect(() => {
-    const updateSpans = () => {
-      document.querySelectorAll('.masonry-item').forEach(item => {
-        const img = item.querySelector('img, video') as any;
-        if (img) {
-          // Handle both video and image element properties
-          const height = img.naturalHeight || img.videoHeight || 1.5;
-          const width = img.naturalWidth || img.videoWidth || 1;
-          const ratio = height / width;
-          const span = Math.ceil(ratio * 18); // tweak multiplier
-          (item as HTMLElement).style.setProperty('--span', span.toString());
-        }
-      });
-    };
-
-    // Run after images load or filter updates
-    const timeout = setTimeout(updateSpans, 300);
-    window.addEventListener('resize', updateSpans);
-    
-    return () => {
-      window.removeEventListener('resize', updateSpans);
-      clearTimeout(timeout);
-    };
-  }, [filteredAndSortedImages, layoutMode]);
-
   return (
     <div className="min-h-screen bg-[#0D0D0D] text-[#E0E0E0] font-sans tracking-tight antialiased selection:bg-orange-500 selection:text-white">
       
@@ -438,7 +407,7 @@ export default function App() {
               
               {/* Sort Selection Clickable Controls */}
               <div className="flex flex-wrap items-center gap-4 text-xs tracking-wider uppercase font-medium text-neutral-400">
-                <span className="text-neutral-500 flex items-center gap-2 font-bold text-[10px] uppercase font-mono tracking-widest"><ArrowUpDown className="w-3.5 h-3.5 text-orange-500" /> Sort Archive</span>
+                <span className="text-neutral-500 flex items-center gap-2 font-bold text-[10px] uppercase font-mono tracking-widest"><ArrowUpDown className="w-3.5 h-3.5 text-orange-500" /> Sort</span>
                 
                 <div className="flex items-center bg-[#0D0D0D] p-0.5 border border-[#333]">
                   <button
@@ -448,7 +417,6 @@ export default function App() {
                         ? 'bg-neutral-800 text-orange-500 font-bold' 
                         : 'text-neutral-400 hover:text-white'
                     }`}
-                    title="Sort by Newest Date"
                   >
                     Newest
                   </button>
@@ -459,7 +427,6 @@ export default function App() {
                         ? 'bg-neutral-800 text-orange-500 font-bold' 
                         : 'text-neutral-400 hover:text-white'
                     }`}
-                    title="Sort by Oldest Date"
                   >
                     Oldest
                   </button>
@@ -473,7 +440,6 @@ export default function App() {
                         ? 'bg-neutral-800 text-orange-500 font-bold' 
                         : 'text-neutral-400 hover:text-white'
                     }`}
-                    title="Sort Alphabetically A to Z"
                   >
                     A - Z
                   </button>
@@ -484,7 +450,6 @@ export default function App() {
                         ? 'bg-neutral-800 text-orange-500 font-bold' 
                         : 'text-neutral-400 hover:text-white'
                     }`}
-                    title="Sort Alphabetically Z to A"
                   >
                     Z - A
                   </button>
@@ -500,10 +465,10 @@ export default function App() {
                       ? 'bg-neutral-800 text-orange-500 font-bold' 
                       : 'text-neutral-500 hover:text-white'
                   }`}
-                  title="Masonry grid layout"
+                  title="Pinterest layout"
                 >
                   <Columns className="w-3.5 h-3.5 text-neutral-400" />
-                  <span className="hidden sm:inline">Masonry</span>
+                  <span className="hidden sm:inline">Pinterest</span>
                 </button>
 
                 <button
@@ -634,20 +599,18 @@ export default function App() {
           /* Gallery Results Grid layouts */
           <div className="py-2.5">
             {layoutMode === 'masonry' && (
-              <div className="masonry-grid grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+              <div className="columns-2 sm:columns-3 md:columns-4 lg:columns-5 gap-4 sm:gap-6 w-full">
                 {filteredAndSortedImages.map((image) => (
                   <div
                      key={image.id}
                      onClick={() => setSelectedImage(image)}
-                     className="masonry-item break-inside-avoid relative group rounded-none border border-[#222] bg-[#0A0A0A] overflow-hidden cursor-pointer shadow-none transition-all duration-300 hover:border-neutral-500 flex flex-col"
+                     className="break-inside-avoid mb-4 sm:mb-6 relative group rounded-2xl border border-[#222] bg-[#0A0A0A] overflow-hidden cursor-pointer shadow-none transition-all duration-300 hover:border-neutral-500 flex flex-col hover:shadow-[0_8px_30px_rgb(0,0,0,0.5)] hover:-translate-y-1"
                   >
-                     
-                     {/* Visual Card Media */}
                      <div className="relative overflow-hidden w-full bg-neutral-900">
                        {image.contentType.startsWith("video/") ? (
                          <video
                            src={image.url}
-                           className="w-full h-auto object-cover max-h-[350px]"
+                           className="w-full h-auto object-cover block"
                            muted
                            loop
                            playsInline
@@ -657,21 +620,16 @@ export default function App() {
                          <img
                            src={image.url}
                            alt={image.name}
-                           className="w-full h-auto object-cover max-h-[350px] transition-transform duration-700 group-hover:scale-[1.015]"
+                           className="w-full h-auto object-cover block transition-transform duration-700 group-hover:scale-[1.03]"
                            loading="lazy"
                            referrerPolicy="no-referrer"
                          />
                        )}
-                       {/* Gradient overlay on hover */}
-                       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-5">
+                       {/* Pinterest style inner gradient and info */}
+                       <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-5">
                          <p className="text-[10px] font-bold text-orange-400 uppercase tracking-[0.2em] mb-1 font-mono">{formatFileSize(image.size)}</p>
-                         <p className="text-[10px] text-neutral-400 tracking-wider font-mono uppercase">Click to open archive details</p>
+                         <p className="text-[10px] text-neutral-200 tracking-wider font-mono uppercase">View details</p>
                        </div>
-                     </div>
-  
-                     {/* Metadata Header Block */}
-                     <div className="p-4 bg-[#0A0A0A]">
-                       <h4 className="text-sm font-medium tracking-wide text-neutral-200 group-hover:text-white transition-colors truncate font-sans">{image.name}</h4>
                      </div>
                   </div>
                 ))}
