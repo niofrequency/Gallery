@@ -599,13 +599,11 @@ export default function App() {
           /* Gallery Results Grid layouts */
           <div className="py-2.5">
             {layoutMode === 'masonry' && (
-              {/* Reduced column count and reduced gap for larger, closer images */}
               <div className="columns-2 sm:columns-2 md:columns-3 lg:columns-4 gap-3 sm:gap-4 w-full">
                 {filteredAndSortedImages.map((image) => (
                   <div
                      key={image.id}
                      onClick={() => setSelectedImage(image)}
-                     {/* Reduced bottom margin to bring vertical spacing closer */}
                      className="break-inside-avoid mb-3 sm:mb-4 relative group rounded-2xl border border-[#222] bg-[#0A0A0A] overflow-hidden cursor-pointer shadow-none transition-all duration-300 hover:border-neutral-500 flex flex-col hover:shadow-[0_8px_30px_rgb(0,0,0,0.5)] hover:-translate-y-1"
                   >
                      <div className="relative overflow-hidden w-full bg-neutral-900">
