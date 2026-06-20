@@ -52,14 +52,20 @@ export default function App() {
 
   const isFirebaseActive = isConfigValid(config);
 
-  // ==================== SIMILARITY ENGINE (FUZZY & CROSS-FIELD) ====================
+  // ==================== SIMILARITY ENGINE (FUZZY & CROSS-FIELD TWEAKED) ====================
   const getSimilarImages = (focus: GalleryImage, allImages: GalleryImage[], limit = 24) => {
     if (!focus) return [];
 
-    // Helper to safely clean and extract meaningful words (allows 2-letter words like "3D", "AI")
+    // Filter out common file extensions and useless connector words
+    const STOP_WORDS = new Set(['the', 'and', 'for', 'with', 'this', 'that', 'jpg', 'png', 'jpeg', 'webp', 'img', 'image', 'copy']);
+
+    // Helper to safely clean and extract meaningful words
     const tokenize = (text: string) => {
       if (!text) return [];
-      return text.toLowerCase().replace(/[^a-z0-9]/g, ' ').split(/\s+/).filter(w => w.length > 1);
+      return text.toLowerCase()
+        .replace(/[^a-z0-9]/g, ' ')
+        .split(/\s+/)
+        .filter(w => w.length > 1 && !STOP_WORDS.has(w));
     };
 
     const focusTags = focus.tags ? focus.tags.map(t => t.toLowerCase().trim()) : [];
@@ -78,30 +84,39 @@ export default function App() {
           if (focusTags.includes(tag)) score += 50; 
         });
 
-        // 2. CROSS-MATCHING: Do the Focus Tags exist in the Image Title/Desc? (and vice versa)
+        // 2. CROSS-MATCHING (Fixed false positives from short words matching substrings)
         imgTags.forEach(tag => {
-          // e.g., Tag "pink" matches title word "pinkhaired"
-          if (focusWords.some(w => tag.includes(w) || w.includes(tag))) score += 20;
+          focusWords.forEach(w => {
+            if (tag === w) score += 25; // Exact cross-match
+            else if (tag.length > 3 && w.length > 3 && (tag.includes(w) || w.includes(tag))) score += 10; // Safe substring
+          });
         });
         focusTags.forEach(tag => {
-          if (imgWords.some(w => tag.includes(w) || w.includes(tag))) score += 20;
+          imgWords.forEach(w => {
+            if (tag === w) score += 25;
+            else if (tag.length > 3 && w.length > 3 && (tag.includes(w) || w.includes(tag))) score += 10;
+          });
         });
 
         // 3. WORD Substring Matches (Title & Description overlapping)
         const matchedWords = new Set<string>();
         focusWords.forEach(fWord => {
           imgWords.forEach(iWord => {
-            // Check for overlap without double counting
-            if (!matchedWords.has(fWord) && (fWord.includes(iWord) || iWord.includes(fWord))) {
-              score += 10;
-              matchedWords.add(fWord);
+            if (!matchedWords.has(fWord)) {
+              if (fWord === iWord) {
+                score += 15; // Exact word match
+                matchedWords.add(fWord);
+              } else if (fWord.length > 3 && iWord.length > 3 && (fWord.includes(iWord) || iWord.includes(fWord))) {
+                score += 5; // Safe partial match
+                matchedWords.add(fWord);
+              }
             }
           });
         });
 
         return { ...img, similarityScore: score };
       })
-      .filter(item => item.similarityScore > 0) // Must have at least one fuzzy overlap
+      .filter(item => item.similarityScore > 0) // Must have at least one overlap
       .sort((a, b) => b.similarityScore - a.similarityScore)
       .slice(0, limit);
   };
