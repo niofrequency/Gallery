@@ -10,7 +10,6 @@ import {
 } from 'firebase/storage';
 import { 
   collection, 
-  getDocs, 
   onSnapshot, 
   doc, 
   setDoc, 
@@ -24,10 +23,7 @@ import { GalleryImage } from './types';
 // ==========================================
 // 📁 DIRECTORY CONFIGURATION 
 // ==========================================
-// CHANGE THIS string to exactly match the folder name in your Firebase screenshot!
-// Example: If your folder is named "Uploads", change it to "Uploads"
-// Example: If your files are in the root, change it to ""
-export const STORAGE_FOLDER_NAME = "images";
+export const STORAGE_FOLDER_NAME = "outputs";
 // ==========================================
 
 export enum OperationType {
@@ -154,7 +150,7 @@ export async function fetchFromStorageBucket(
  */
 export function setupFirestoreRealtimeListener(
   firestore: Firestore,
-  collectionName: string,
+  collectionName: string = STORAGE_FOLDER_NAME,
   onUpdate: (images: GalleryImage[]) => void,
   onErr: (error: any) => void
 ) {
@@ -249,7 +245,7 @@ export function uploadImageToFirebase(
             };
 
             if (useFirestore && firestore) {
-              const docRef = doc(collection(firestore, 'images'), cleanFileName);
+              const docRef = doc(collection(firestore, STORAGE_FOLDER_NAME), cleanFileName);
               await setDoc(docRef, { ...imageDoc });
             }
 
@@ -298,7 +294,7 @@ export function uploadImageToFirebase(
             };
 
             if (useFirestore && firestore) {
-              const docRef = doc(collection(firestore, 'images'), cleanFileName);
+              const docRef = doc(collection(firestore, STORAGE_FOLDER_NAME), cleanFileName);
               await setDoc(docRef, { ...imageDoc });
             }
 
@@ -332,10 +328,10 @@ export async function deleteImageFromFirebase(
   // Delete from Firestore
   if (useFirestore && firestore) {
     try {
-      const docRef = doc(firestore, 'images', image.id);
+      const docRef = doc(firestore, STORAGE_FOLDER_NAME, image.id);
       await deleteDoc(docRef);
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `images/${image.id}`);
+      handleFirestoreError(error, OperationType.DELETE, `${STORAGE_FOLDER_NAME}/${image.id}`);
     }
   }
 }
@@ -366,10 +362,10 @@ export async function renameImageInFirebase(
   // Update in Firestore
   if (useFirestore && firestore) {
     try {
-      const docRef = doc(firestore, 'images', image.id);
+      const docRef = doc(firestore, STORAGE_FOLDER_NAME, image.id);
       await setDoc(docRef, { name: newName }, { merge: true });
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `images/${image.id}`);
+      handleFirestoreError(error, OperationType.UPDATE, `${STORAGE_FOLDER_NAME}/${image.id}`);
     }
   }
 }
