@@ -52,50 +52,56 @@ export default function App() {
 
   const isFirebaseActive = isConfigValid(config);
 
-  // ==================== SIMILARITY ENGINE (BAG OF WORDS) ====================
+  // ==================== SIMILARITY ENGINE (FUZZY & CROSS-FIELD) ====================
   const getSimilarImages = (focus: GalleryImage, allImages: GalleryImage[], limit = 24) => {
     if (!focus) return [];
 
-    // Helper to clean and extract useful keywords (ignores tiny words like 'a', 'is')
-    const extractWords = (text: string) => {
+    // Helper to safely clean and extract meaningful words (allows 2-letter words like "3D", "AI")
+    const tokenize = (text: string) => {
       if (!text) return [];
-      return text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 2);
+      return text.toLowerCase().replace(/[^a-z0-9]/g, ' ').split(/\s+/).filter(w => w.length > 1);
     };
 
     const focusTags = focus.tags ? focus.tags.map(t => t.toLowerCase().trim()) : [];
-    const focusWords = new Set([
-      ...extractWords(focus.name),
-      ...extractWords(focus.description || ""),
-      ...focusTags
-    ]);
+    const focusWords = tokenize(focus.name + " " + (focus.description || ""));
 
     return allImages
       .filter(img => img.id !== focus.id)
       .map(img => {
         let score = 0;
 
-        // 1. Direct Tag Matches (Highest Value)
         const imgTags = img.tags ? img.tags.map(t => t.toLowerCase().trim()) : [];
+        const imgWords = tokenize(img.name + " " + (img.description || ""));
+
+        // 1. EXACT Tag Matches (Massive Signal)
         imgTags.forEach(tag => {
-          if (focusTags.includes(tag)) score += 20;
-          else if (focusWords.has(tag)) score += 10;
+          if (focusTags.includes(tag)) score += 50; 
         });
 
-        // 2. Keyword Matches in Title & Description
-        const imgWords = [
-          ...extractWords(img.name),
-          ...extractWords(img.description || "")
-        ];
+        // 2. CROSS-MATCHING: Do the Focus Tags exist in the Image Title/Desc? (and vice versa)
+        imgTags.forEach(tag => {
+          // e.g., Tag "pink" matches title word "pinkhaired"
+          if (focusWords.some(w => tag.includes(w) || w.includes(tag))) score += 20;
+        });
+        focusTags.forEach(tag => {
+          if (imgWords.some(w => tag.includes(w) || w.includes(tag))) score += 20;
+        });
 
-        // Score unique shared words
-        const uniqueImgWords = new Set(imgWords);
-        uniqueImgWords.forEach(word => {
-          if (focusWords.has(word)) score += 5;
+        // 3. WORD Substring Matches (Title & Description overlapping)
+        const matchedWords = new Set<string>();
+        focusWords.forEach(fWord => {
+          imgWords.forEach(iWord => {
+            // Check for overlap without double counting
+            if (!matchedWords.has(fWord) && (fWord.includes(iWord) || iWord.includes(fWord))) {
+              score += 10;
+              matchedWords.add(fWord);
+            }
+          });
         });
 
         return { ...img, similarityScore: score };
       })
-      .filter(item => item.similarityScore > 0) // Remove items with 0 shared keywords
+      .filter(item => item.similarityScore > 0) // Must have at least one fuzzy overlap
       .sort((a, b) => b.similarityScore - a.similarityScore)
       .slice(0, limit);
   };
@@ -472,7 +478,7 @@ export default function App() {
                     
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/15 transition-colors duration-300" />
                     
-                    {image.similarityScore > 15 && (
+                    {image.similarityScore >= 30 && (
                       <div className="absolute top-3 right-3 bg-black/70 text-[10px] px-2.5 py-1 rounded-full text-orange-400 font-mono tracking-widest">
                         Strong Match
                       </div>
