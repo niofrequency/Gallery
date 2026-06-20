@@ -5,7 +5,7 @@
 
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getStorage, FirebaseStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { getFirestore, Firestore } from 'firebase/firestore';
+import { Firestore } from 'firebase/firestore'; // Only importing the type, not the initialization function
 import { getAnalytics, isSupported } from 'firebase/analytics';
 import { FirebaseConfig } from './types';
 
@@ -35,8 +35,7 @@ export const storage = getStorage(defaultApp);
 
 /**
  * Uploads a Blob (Image or Video) to Firebase Storage and returns the public download URL.
- * 
- * @param fileBlob The raw Blob data of the generated asset.
+ * * @param fileBlob The raw Blob data of the generated asset.
  * @param storagePath The path in your bucket (e.g., 'outputs/12345.mp4')
  * @returns The permanent Firebase HTTP Download URL
  */
@@ -121,13 +120,16 @@ export const initializeFirebaseServices = (config: FirebaseConfig) => {
   if (configStr === JSON.stringify(DEFAULT_BLANK_CONFIG)) {
     initializedApp = defaultApp;
     initializedStorage = storage;
-    initializedFirestore = getFirestore(defaultApp);
+    
+    // FIRESTORE DISABLED: Set to null to prevent the app from searching for a database
+    initializedFirestore = null; 
+    
     lastUsedConfigString = configStr;
     
     return {
       app: initializedApp!,
       storage: initializedStorage!,
-      firestore: initializedFirestore!
+      firestore: initializedFirestore as unknown as Firestore // Cast to satisfy downstream types
     };
   }
   
@@ -146,14 +148,17 @@ export const initializeFirebaseServices = (config: FirebaseConfig) => {
     }
     
     initializedStorage = getStorage(initializedApp);
-    initializedFirestore = getFirestore(initializedApp);
+    
+    // FIRESTORE DISABLED: Set to null to prevent the app from searching for a database
+    initializedFirestore = null; 
+    
     lastUsedConfigString = configStr;
   }
 
   return {
     app: initializedApp!,
     storage: initializedStorage!,
-    firestore: initializedFirestore!
+    firestore: initializedFirestore as unknown as Firestore // Cast to satisfy downstream types
   };
 };
 
