@@ -52,6 +52,50 @@ export default function App() {
 
   const isFirebaseActive = isConfigValid(config);
 
+  // ==================== SIMILARITY ENGINE ====================
+  const getSimilarImages = (focus: GalleryImage, allImages: GalleryImage[], limit = 24) => {
+    if (!focus) return [];
+    
+    const focusTags = new Set(focus.tags.map(t => t.toLowerCase().trim()));
+    const focusNameWords = focus.name.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+    const focusDesc = (focus.description || "").toLowerCase();
+
+    return allImages
+      .filter(img => img.id !== focus.id)
+      .map(img => {
+        let score = 0;
+        
+        // 1. Tag matching (strongest signal)
+        const imgTags = img.tags.map(t => t.toLowerCase().trim());
+        const commonTags = imgTags.filter(tag => focusTags.has(tag));
+        score += commonTags.length * 15;
+
+        // 2. Keyword matching in filename
+        const imgName = img.name.toLowerCase();
+        focusNameWords.forEach(word => {
+          if (imgName.includes(word)) score += 8;
+        });
+
+        // 3. Description matching
+        if (focusDesc) {
+          const imgDesc = (img.description || "").toLowerCase();
+          if (imgDesc.includes(focusDesc)) score += 6;
+        }
+
+        // 4. Bonus for shared long keywords (e.g. "pink", "hair", "tattoo", etc.)
+        imgTags.forEach(tag => {
+          if (focusNameWords.some(word => tag.includes(word) || word.includes(tag))) {
+            score += 5;
+          }
+        });
+
+        return { ...img, similarityScore: score };
+      })
+      .filter(item => item.similarityScore > 0) // Only return items with at least some match
+      .sort((a, b) => b.similarityScore - a.similarityScore)
+      .slice(0, limit);
+  };
+
   // Hook up sync & listener
   useEffect(() => {
     let unsubscribe: (() => void) | null = null;
@@ -405,24 +449,54 @@ export default function App() {
             {/* Similarity Grid */}
             <div className="mt-8 border-t border-[#222] pt-8">
               <div className="text-center mb-8">
-                <h3 className="text-xl font-bold tracking-widest uppercase italic font-serif text-white">More like this</h3>
+                <h3 className="text-xl font-bold tracking-widest uppercase italic font-serif text-white">
+                  More like this
+                </h3>
+                <p className="text-xs text-neutral-500 mt-1">
+                  Based on tags and visual keywords
+                </p>
               </div>
               <div className="columns-2 sm:columns-3 lg:columns-4 min-[1400px]:columns-5 2xl:columns-6 min-[1800px]:columns-7 gap-3 sm:gap-4 w-full">
-                {images.filter(img => img.id !== pinterestFocus.id).sort(() => 0.5 - Math.random()).slice(0, 20).map((image) => (
+                {getSimilarImages(pinterestFocus, images).map((image: any) => (
                   <div
                     key={image.id}
                     onClick={() => handleImageClick(image)}
                     className="break-inside-avoid mb-3 sm:mb-4 relative group rounded-2xl border border-[#222] bg-[#0A0A0A] overflow-hidden cursor-zoom-in transition-all duration-300 hover:border-neutral-500 hover:-translate-y-1"
                   >
                     {image.contentType.startsWith("video/") ? (
-                      <video src={image.url} className="w-full h-auto object-cover block" muted loop autoPlay playsInline />
+                      <video 
+                        src={image.url} 
+                        className="w-full h-auto object-cover block" 
+                        muted 
+                        loop 
+                        autoPlay 
+                        playsInline 
+                      />
                     ) : (
-                      <img src={image.url} alt={image.name} className="w-full h-auto object-cover block transition-transform duration-700 group-hover:scale-[1.03]" loading="lazy" />
+                      <img 
+                        src={image.url} 
+                        alt={image.name} 
+                        className="w-full h-auto object-cover block transition-transform duration-700 group-hover:scale-[1.03]" 
+                        loading="lazy" 
+                      />
                     )}
+                    
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/15 transition-colors duration-300" />
+                    
+                    {/* Show match strength */}
+                    {image.similarityScore > 15 && (
+                      <div className="absolute top-3 right-3 bg-black/70 text-[10px] px-2.5 py-1 rounded-full text-orange-400 font-mono tracking-widest">
+                        Strong Match
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
+              
+              {/* Fallback message if no good matches */}
+              {getSimilarImages(pinterestFocus, images).length === 0 && (
+                <p className="text-center text-neutral-500 py-12">No similar images found.</p>
+              )}
             </div>
           </div>
         ) : (
@@ -640,7 +714,6 @@ export default function App() {
                                referrerPolicy="no-referrer"
                              />
                            )}
-                           {/* Removed original text label overlays, kept subtle hover darkness */}
                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/15 transition-colors duration-300" />
                          </div>
                       </div>
