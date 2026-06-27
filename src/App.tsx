@@ -32,7 +32,7 @@ import {
 } from 'lucide-react';
 
 // ==================== PERSISTENCE HELPERS ====================
-// These keep the grid and focused image from disappearing on page refresh
+// These keep data alive if you hit F5/Refresh
 const getInitialImages = (): GalleryImage[] => {
   try {
     const cached = localStorage.getItem('vantage_cached_images');
@@ -54,12 +54,13 @@ export default function App() {
   const [config, setConfig] = useState<FirebaseConfig>(getStoredConfig());
   const [syncMode, setSyncMode] = useState<'storage' | 'firestore'>('storage');
   
-  // Use persistent state initializers
+  // Use persistent state initializers so F5 doesn't wipe the screen
   const [images, setImages] = useState<GalleryImage[]>(getInitialImages);
   const [pinterestFocus, setPinterestFocus] = useState<GalleryImage | null>(getInitialFocus);
+  const [scrollPos, setScrollPos] = useState(0); // Tracks scroll position for seamless back-navigation
   
-  // Only show full loading skeletons if we have absolutely no images cached
-  const [loading, setLoading] = useState<boolean>(images.length === 0);
+  // Only show skeletons if we have absolutely 0 images
+  const [loading, setLoading] = useState(images.length === 0);
   const [error, setError] = useState("");
   
   // UI states
@@ -75,7 +76,6 @@ export default function App() {
   const isFirebaseActive = isConfigValid(config);
 
   // ==================== STATE SYNC HOOKS ====================
-  // Quietly save state to storage whenever it changes so it survives page reloads
   useEffect(() => {
     if (images.length > 0) {
       try { localStorage.setItem('vantage_cached_images', JSON.stringify(images)); } catch (e) {}
@@ -90,15 +90,18 @@ export default function App() {
     }
   }, [pinterestFocus]);
 
-
-  // ==================== SIMILARITY ENGINE (FUZZY & CROSS-FIELD) ====================
+  // ==================== SIMILARITY ENGINE ====================
   const getSimilarImages = (focus: GalleryImage, allImages: GalleryImage[], limit = 24) => {
     if (!focus) return [];
 
-    // Helper to safely clean and extract meaningful words (allows 2-letter words like "3D", "AI")
+    const STOP_WORDS = new Set(['the', 'and', 'for', 'with', 'this', 'that', 'jpg', 'png', 'jpeg', 'webp', 'img', 'image', 'copy']);
+
     const tokenize = (text: string) => {
       if (!text) return [];
-      return text.toLowerCase().replace(/[^a-z0-9]/g, ' ').split(/\s+/).filter(w => w.length > 1);
+      return text.toLowerCase()
+        .replace(/[^a-z0-9]/g, ' ')
+        .split(/\s+/)
+        .filter(w => w.length > 1 && !STOP_WORDS.has(w));
     };
 
     const focusTags = focus.tags ? focus.tags.map(t => t.toLowerCase().trim()) : [];
@@ -112,35 +115,44 @@ export default function App() {
         const imgTags = img.tags ? img.tags.map(t => t.toLowerCase().trim()) : [];
         const imgWords = tokenize(img.name + " " + (img.description || ""));
 
-        // 1. EXACT Tag Matches (Massive Signal)
+        // 1. EXACT Tag Matches
         imgTags.forEach(tag => {
           if (focusTags.includes(tag)) score += 50; 
         });
 
-        // 2. CROSS-MATCHING: Do the Focus Tags exist in the Image Title/Desc? (and vice versa)
+        // 2. CROSS-MATCHING
         imgTags.forEach(tag => {
-          // e.g., Tag "pink" matches title word "pinkhaired"
-          if (focusWords.some(w => tag.includes(w) || w.includes(tag))) score += 20;
+          focusWords.forEach(w => {
+            if (tag === w) score += 25; 
+            else if (tag.length > 3 && w.length > 3 && (tag.includes(w) || w.includes(tag))) score += 10; 
+          });
         });
         focusTags.forEach(tag => {
-          if (imgWords.some(w => tag.includes(w) || w.includes(tag))) score += 20;
+          imgWords.forEach(w => {
+            if (tag === w) score += 25;
+            else if (tag.length > 3 && w.length > 3 && (tag.includes(w) || w.includes(tag))) score += 10;
+          });
         });
 
-        // 3. WORD Substring Matches (Title & Description overlapping)
+        // 3. WORD Substring Matches
         const matchedWords = new Set<string>();
         focusWords.forEach(fWord => {
           imgWords.forEach(iWord => {
-            // Check for overlap without double counting
-            if (!matchedWords.has(fWord) && (fWord.includes(iWord) || iWord.includes(fWord))) {
-              score += 10;
-              matchedWords.add(fWord);
+            if (!matchedWords.has(fWord)) {
+              if (fWord === iWord) {
+                score += 15; 
+                matchedWords.add(fWord);
+              } else if (fWord.length > 3 && iWord.length > 3 && (fWord.includes(iWord) || iWord.includes(fWord))) {
+                score += 5; 
+                matchedWords.add(fWord);
+              }
             }
           });
         });
 
         return { ...img, similarityScore: score };
       })
-      .filter(item => item.similarityScore > 0) // Must have at least one fuzzy overlap
+      .filter(item => item.similarityScore > 0)
       .sort((a, b) => b.similarityScore - a.similarityScore)
       .slice(0, limit);
   };
@@ -149,7 +161,6 @@ export default function App() {
   useEffect(() => {
     let unsubscribe: (() => void) | null = null;
     
-    // Only set loading true if we don't have cached images to show
     if (images.length === 0) setLoading(true);
     setError("");
 
@@ -158,7 +169,6 @@ export default function App() {
         const services = initializeFirebaseServices(config);
         
         if (syncMode === 'firestore') {
-          // Firestore Realtime Sync Mode
           unsubscribe = setupFirestoreRealtimeListener(
             services.firestore,
             'images',
@@ -173,7 +183,6 @@ export default function App() {
             }
           );
         } else {
-          // Storage Bucket Listing Mode
           fetchFromStorageBucket(services.storage, STORAGE_FOLDER_NAME)
             .then((fetchedImages) => {
               setImages(fetchedImages);
@@ -196,7 +205,6 @@ export default function App() {
         setLoading(false);
       }
     } else {
-      // Demo Mode
       const timer = setTimeout(() => {
         setImages(getDemoImages());
         setLoading(false);
@@ -211,7 +219,6 @@ export default function App() {
 
   // Handle Manual Refresh
   const handleRefresh = async () => {
-    // Prevent the UI from disappearing during a background sync
     setError("");
     if (isFirebaseActive) {
       try {
@@ -257,7 +264,6 @@ export default function App() {
       reader.readAsDataURL(file);
       await new Promise<void>((resolve) => {
         reader.onload = () => {
-          const computedRatio = 1.33; // Mock default ratio
           const demoImage: GalleryImage = {
             id: `demo-upload-${Date.now()}`,
             name: metadata.name,
@@ -339,9 +345,22 @@ export default function App() {
     setPinterestFocus(prev => prev && prev.id === image.id ? { ...prev, name: cleanName } : prev);
   };
 
+  // NAVIGATION HANDLERS
   const handleImageClick = (image: GalleryImage) => {
+    // Save scroll position BEFORE switching views so we can snap back to it later
+    if (!pinterestFocus) {
+      setScrollPos(window.scrollY);
+    }
     setPinterestFocus(image);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleBackToArchive = () => {
+    setPinterestFocus(null);
+    // Restore the exact scroll position instantly when the grid un-hides
+    setTimeout(() => {
+      window.scrollTo({ top: scrollPos, behavior: 'instant' });
+    }, 10);
   };
 
   // Perform client side search
@@ -365,7 +384,7 @@ export default function App() {
       }
     });
 
-  // Memoized similar images for better performance
+  // Memoized similar images
   const similarImages = useMemo(() => {
     return pinterestFocus ? getSimilarImages(pinterestFocus, images, 24) : [];
   }, [pinterestFocus, images]);
@@ -379,7 +398,7 @@ export default function App() {
           
           <div 
             className="flex items-center gap-4 cursor-pointer" 
-            onClick={() => setPinterestFocus(null)}
+            onClick={handleBackToArchive}
           >
             <div className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse"></div>
             <div>
@@ -445,12 +464,14 @@ export default function App() {
           </div>
         )}
 
-        {pinterestFocus ? (
-          /* Similarity Detail View */
+        {/* DOM PERSISTENCE: We render both views, but use CSS to hide the one we aren't looking at */}
+        
+        {/* ================= SIMILARITY DETAIL VIEW ================= */}
+        {pinterestFocus && (
           <div className="flex flex-col gap-10 animate-in fade-in duration-500">
             <div className="flex justify-between items-center bg-[#0A0A0A] border border-[#222] p-4">
                <button
-                 onClick={() => setPinterestFocus(null)}
+                 onClick={handleBackToArchive}
                  className="px-5 py-2.5 bg-[#1A1A1A] hover:bg-[#222] text-white border border-[#333] font-bold text-[10px] uppercase tracking-widest transition"
                >
                  ← Back to Archive
@@ -507,6 +528,12 @@ export default function App() {
                     )}
                     
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/15 transition-colors duration-300" />
+                    
+                    {image.similarityScore >= 30 && (
+                      <div className="absolute top-3 right-3 bg-black/70 text-[10px] px-2.5 py-1 rounded-full text-orange-400 font-mono tracking-widest">
+                        Strong Match
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -516,9 +543,12 @@ export default function App() {
               )}
             </div>
           </div>
-        ) : (
-          /* Main Feed View */
-          <>
+        )}
+
+        {/* ================= MAIN FEED VIEW (HIDDEN IF DETAIL IS OPEN) ================= */}
+        <div className={pinterestFocus ? 'hidden' : 'flex flex-col gap-6 animate-in fade-in duration-300'}>
+            
+            {/* Toolbar and Filters */}
             <div className="bg-[#0A0A0A] border border-[#222] p-6 rounded-none flex flex-col gap-5">
               <div className="flex flex-col xl:flex-row items-center justify-between gap-5">
                 
@@ -621,17 +651,17 @@ export default function App() {
 
                   <button
                     onClick={handleRefresh}
+                    disabled={loading}
                     className="p-2.5 px-3.5 bg-[#0D0D0D] hover:bg-neutral-950 border border-[#333] text-[#E0E0E0] hover:text-white transition flex items-center justify-center gap-2 text-[10px] uppercase tracking-[0.2em] font-bold cursor-pointer"
                     title="Reload files from Storage"
                   >
-                    <RefreshCw className="w-3.5 h-3.5" />
+                    <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-orange-500' : ''}`} />
                     <span>Sync</span>
                   </button>
                 </div>
               </div>
             </div>
 
-            {/* ONLY render Skeletons if we have ZERO images, preventing the grid from disappearing */}
             {loading && images.length === 0 ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 min-[1400px]:grid-cols-5 2xl:grid-cols-6 min-[1800px]:grid-cols-7 gap-3 sm:gap-4 py-6 font-sans w-full">
                 {Array.from({ length: 14 }).map((_, idx) => (
@@ -649,7 +679,6 @@ export default function App() {
                 ))}
               </div>
             ) : filteredAndSortedImages.length === 0 ? (
-              
               <div className="py-24 border border-dashed border-[#333] bg-[#0A0A0A] flex flex-col items-center justify-center text-center gap-5 rounded-none">
                 <div className="p-5 bg-[#0D0D0D] border border-[#222] text-neutral-500 rounded-none">
                   <FolderOpen className="w-8 h-8 text-orange-500" />
@@ -662,9 +691,7 @@ export default function App() {
                 </div>
                 <div className="flex gap-3 text-xs mt-3">
                   <button
-                    onClick={() => {
-                      setSearchQuery("");
-                    }}
+                    onClick={() => setSearchQuery("")}
                     className="px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 rounded-none transition border border-[#333] cursor-pointer font-bold uppercase tracking-widest text-[10px]"
                   >
                     Clear Filters
@@ -678,7 +705,6 @@ export default function App() {
                 </div>
               </div>
             ) : (
-              
               <div className="py-2.5">
                 {layoutMode === 'masonry' && (
                   <div className="columns-2 sm:columns-3 lg:columns-4 min-[1400px]:columns-5 2xl:columns-6 min-[1800px]:columns-7 gap-3 sm:gap-4 w-full">
@@ -797,8 +823,7 @@ export default function App() {
                 )}
               </div>
             )}
-          </>
-        )}
+        </div>
       </main>
 
       <FirebaseConfigPanel
