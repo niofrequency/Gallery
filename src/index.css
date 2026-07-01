@@ -6,3 +6,19 @@
   --font-serif: "Cormorant Garamond", ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
+
+/* Base styles to fix mobile white borders and bounce effects */
+html, body {
+  background-color: #050505; /* Matches your App.tsx deep dark theme */
+  color: #E0E0E0;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh; /* Uses dynamic viewport height for mobile browsers */
+  overscroll-behavior-y: none; /* Disables the white pull-to-refresh bounce on mobile */
+}
+
+#root {
+  min-height: 100dvh;
+}
