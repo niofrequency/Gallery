@@ -415,7 +415,7 @@ export default function App() {
           >
             <div className="w-2.5 h-2.5 rounded-full bg-red-600 shadow-[0_0_12px_rgba(220,38,38,0.8)] group-hover:scale-150 transition-transform duration-500"></div>
             <div>
-              <h1 className="text-xl tracking-[0.2em] font-light text-white uppercase">Vantage<span className="font-bold">Archive</span></h1>
+              <h1 className="text-xl tracking-[0.2em] font-light text-white uppercase">MARK'S<span className="font-bold">Archive</span></h1>
             </div>
           </div>
 
