@@ -32,7 +32,6 @@ import {
 } from 'lucide-react';
 
 // ==================== PERSISTENCE HELPERS ====================
-// These keep data alive if you hit F5/Refresh
 const getInitialImages = (): GalleryImage[] => {
   try {
     const cached = localStorage.getItem('vantage_cached_images');
@@ -54,12 +53,10 @@ export default function App() {
   const [config, setConfig] = useState<FirebaseConfig>(getStoredConfig());
   const [syncMode, setSyncMode] = useState<'storage' | 'firestore'>('storage');
   
-  // Use persistent state initializers so F5 doesn't wipe the screen
   const [images, setImages] = useState<GalleryImage[]>(getInitialImages);
   const [pinterestFocus, setPinterestFocus] = useState<GalleryImage | null>(getInitialFocus);
-  const [scrollPos, setScrollPos] = useState(0); // Tracks scroll position for seamless back-navigation
+  const [scrollPos, setScrollPos] = useState(0); 
   
-  // Only show skeletons if we have absolutely 0 images
   const [loading, setLoading] = useState(images.length === 0);
   const [error, setError] = useState("");
   
@@ -239,51 +236,64 @@ export default function App() {
     }
   };
 
-  // Handle uploading files
+  // ==================== MULTI-UPLOAD HANDLER ====================
   const handleUpload = async (
-    file: File, 
+    files: File | File[], 
     metadata: { name: string; description: string; tags: string[] }
   ) => {
+    // Ensure we are working with an array even if a single file is passed
+    const fileArray = Array.isArray(files) ? files : [files];
+
     if (isFirebaseActive) {
       const services = initializeFirebaseServices(config);
-      await uploadImageToFirebase(
-        services.storage,
-        services.firestore,
-        file,
-        metadata,
-        syncMode === 'firestore',
-        (progress) => {}
-      );
+      
+      // Upload all files concurrently
+      await Promise.all(fileArray.map(file => {
+        // If uploading multiple files, use original filename to prevent them all sharing the exact same text title
+        const finalName = fileArray.length > 1 ? file.name : metadata.name;
+        
+        return uploadImageToFirebase(
+          services.storage,
+          services.firestore,
+          file,
+          { ...metadata, name: finalName },
+          syncMode === 'firestore',
+          (progress) => {}
+        );
+      }));
       
       if (syncMode === 'storage') {
         const refreshed = await fetchFromStorageBucket(services.storage, STORAGE_FOLDER_NAME);
         setImages(refreshed);
       }
     } else {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      await new Promise<void>((resolve) => {
-        reader.onload = () => {
-          const demoImage: GalleryImage = {
-            id: `demo-upload-${Date.now()}`,
-            name: metadata.name,
-            url: reader.result as string,
-            path: `demo/images/${file.name}`,
-            size: file.size,
-            contentType: file.type,
-            createdAt: Date.now(),
-            tags: metadata.tags,
-            description: metadata.description,
-            aspectRatio: 1.33
+      // Demo Mode simulated upload for multiple files
+      const newDemoImages = await Promise.all(fileArray.map(async (file, index) => {
+        return new Promise<GalleryImage>((resolve) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(file);
+          reader.onload = () => {
+            const finalName = fileArray.length > 1 ? file.name : metadata.name;
+            resolve({
+              id: `demo-upload-${Date.now()}-${index}`,
+              name: finalName,
+              url: reader.result as string,
+              path: `demo/images/${file.name}`,
+              size: file.size,
+              contentType: file.type,
+              createdAt: Date.now() + index,
+              tags: metadata.tags,
+              description: metadata.description,
+              aspectRatio: 1.33
+            });
           };
+        });
+      }));
 
-          const existingDemo = getDemoImages();
-          const updatedDemo = [demoImage, ...existingDemo];
-          saveDemoImages(updatedDemo);
-          setImages(updatedDemo);
-          resolve();
-        };
-      });
+      const existingDemo = getDemoImages();
+      const updatedDemo = [...newDemoImages, ...existingDemo];
+      saveDemoImages(updatedDemo);
+      setImages(updatedDemo);
     }
   };
 
@@ -347,7 +357,6 @@ export default function App() {
 
   // NAVIGATION HANDLERS
   const handleImageClick = (image: GalleryImage) => {
-    // Save scroll position BEFORE switching views so we can snap back to it later
     if (!pinterestFocus) {
       setScrollPos(window.scrollY);
     }
@@ -357,7 +366,6 @@ export default function App() {
 
   const handleBackToArchive = () => {
     setPinterestFocus(null);
-    // Restore the exact scroll position instantly when the grid un-hides
     setTimeout(() => {
       window.scrollTo({ top: scrollPos, behavior: 'instant' });
     }, 10);
@@ -384,7 +392,6 @@ export default function App() {
       }
     });
 
-  // Memoized similar images
   const similarImages = useMemo(() => {
     return pinterestFocus ? getSimilarImages(pinterestFocus, images, 24) : [];
   }, [pinterestFocus, images]);
