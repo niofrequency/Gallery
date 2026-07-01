@@ -28,7 +28,10 @@ import {
   AlertCircle,
   RefreshCw,
   FolderOpen,
-  X
+  X,
+  Settings,
+  Image as ImageIcon,
+  Film
 } from 'lucide-react';
 
 // ==================== PERSISTENCE HELPERS ====================
@@ -69,6 +72,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [layoutMode, setLayoutMode] = useState<LayoutMode>('masonry');
   const [sortBy, setSortBy] = useState<string>('date-desc');
+  const [mediaFilter, setMediaFilter] = useState<'all' | 'image' | 'video'>('all');
 
   const isFirebaseActive = isConfigValid(config);
 
@@ -241,15 +245,12 @@ export default function App() {
     files: File | File[], 
     metadata: { name: string; description: string; tags: string[] }
   ) => {
-    // Ensure we are working with an array even if a single file is passed
     const fileArray = Array.isArray(files) ? files : [files];
 
     if (isFirebaseActive) {
       const services = initializeFirebaseServices(config);
       
-      // Upload all files concurrently
       await Promise.all(fileArray.map(file => {
-        // If uploading multiple files, use original filename to prevent them all sharing the exact same text title
         const finalName = fileArray.length > 1 ? file.name : metadata.name;
         
         return uploadImageToFirebase(
@@ -267,7 +268,6 @@ export default function App() {
         setImages(refreshed);
       }
     } else {
-      // Demo Mode simulated upload for multiple files
       const newDemoImages = await Promise.all(fileArray.map(async (file, index) => {
         return new Promise<GalleryImage>((resolve) => {
           const reader = new FileReader();
@@ -371,9 +371,14 @@ export default function App() {
     }, 10);
   };
 
-  // Perform client side search
+  // Perform client side search & filter
   const filteredAndSortedImages = images
     .filter(img => {
+      // 1. Media Type Filter
+      if (mediaFilter === 'image' && !img.contentType.startsWith('image/')) return false;
+      if (mediaFilter === 'video' && !img.contentType.startsWith('video/')) return false;
+
+      // 2. Search Query Filter
       const matchesSearch = searchQuery.trim() === "" || 
         img.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         img.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -397,58 +402,53 @@ export default function App() {
   }, [pinterestFocus, images]);
 
   return (
-    <div className="min-h-screen bg-[#0D0D0D] text-[#E0E0E0] font-sans tracking-tight antialiased selection:bg-orange-500 selection:text-white">
+    <div className="min-h-screen bg-[#050505] text-[#E0E0E0] font-sans tracking-tight antialiased selection:bg-red-800 selection:text-white">
       
-      {/* Sticky Main Header */}
-      <header className="sticky top-0 z-30 bg-[#0A0A0A]/95 backdrop-blur-md border-b border-[#222] px-4 sm:px-6 md:px-8 py-5">
-        <div className="w-full mx-auto flex items-center justify-between">
+      {/* Remodeled Premium Header */}
+      <header className="sticky top-0 z-40 bg-black/70 backdrop-blur-xl border-b border-white/5 px-6 py-4 transition-all duration-300">
+        <div className="w-full mx-auto max-w-[2400px] flex items-center justify-between">
           
+          {/* Logo Brand Title */}
           <div 
-            className="flex items-center gap-4 cursor-pointer" 
+            className="flex items-center gap-3 cursor-pointer group" 
             onClick={handleBackToArchive}
           >
-            <div className="w-2.5 h-2.5 rounded-full bg-orange-500 animate-pulse"></div>
+            <div className="w-2.5 h-2.5 rounded-full bg-red-600 shadow-[0_0_12px_rgba(220,38,38,0.8)] group-hover:scale-150 transition-transform duration-500"></div>
             <div>
-              <h1 className="text-xl sm:text-2xl font-bold tracking-widest uppercase italic font-serif text-white">Vantage.Archive</h1>
-              <p className="text-[9px] uppercase tracking-[0.25em] font-mono text-neutral-500 mt-0.5">Firebase Asset Registry</p>
+              <h1 className="text-xl tracking-[0.2em] font-light text-white uppercase">Vantage<span className="font-bold">Archive</span></h1>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div 
-              onClick={() => setIsConfigOpen(true)}
-              className={`hidden md:flex items-center gap-2.5 bg-[#1A1A1A] px-4 py-2 rounded-none border text-[10px] uppercase font-bold tracking-wider cursor-pointer select-none transition ${
-                isFirebaseActive 
-                  ? 'border-[#333] text-[#E0E0E0] hover:text-white hover:border-neutral-500' 
-                  : 'border-amber-500/30 text-amber-500 hover:border-amber-500'
-              }`}
-            >
-              <span className="text-neutral-500">Firebase Status:</span>
-              {isFirebaseActive ? (
-                <span className="text-green-400">Connected</span>
-              ) : (
-                <span className="text-amber-500">Playground</span>
-              )}
-            </div>
-
+          {/* Header Actions */}
+          <div className="flex items-center gap-6">
             <button
               onClick={() => setIsUploadOpen(true)}
-              className="flex items-center gap-2 bg-white text-black font-bold px-5 py-2.5 text-xs rounded-none border border-transparent hover:bg-orange-500 hover:text-white tracking-[0.2em] uppercase transition-all duration-150 cursor-pointer"
+              className="flex items-center gap-2 bg-white text-black px-6 py-2.5 rounded-full text-[10px] font-bold tracking-widest uppercase hover:bg-red-700 hover:text-white hover:shadow-[0_0_20px_rgba(185,28,28,0.4)] transition-all duration-300"
             >
               <Plus className="w-3.5 h-3.5 shrink-0" />
               <span>Upload</span>
+            </button>
+            
+            {/* Subtle Settings Icon to prevent blocking UI */}
+            <button 
+              onClick={() => setIsConfigOpen(true)}
+              className="relative p-2 text-neutral-500 hover:text-white transition-colors duration-300"
+              title="Database Settings"
+            >
+              <Settings className="w-5 h-5 hover:rotate-90 transition-transform duration-500" />
+              <div className={`absolute top-1.5 right-1.5 w-2 h-2 rounded-full border-2 border-black ${isFirebaseActive ? 'bg-green-500' : 'bg-amber-500'}`} />
             </button>
           </div>
         </div>
       </header>
 
       {/* Main Container Workspace */}
-      <main className="w-full mx-auto px-4 sm:px-6 md:px-8 py-8 flex flex-col gap-6">
+      <main className="w-full mx-auto max-w-[2400px] px-4 sm:px-6 md:px-8 py-8 flex flex-col gap-8">
         
         {error && (
-          <div className="p-4 bg-red-950/25 border border-red-900/40 text-red-400 rounded-2xl flex flex-col sm:flex-row gap-3 sm:items-center justify-between text-xs shadow-lg shadow-red-500/5">
+          <div className="p-4 bg-red-950/20 border border-red-900/30 text-red-400 rounded-xl flex flex-col sm:flex-row gap-3 sm:items-center justify-between text-xs backdrop-blur-md">
             <div className="flex items-start sm:items-center gap-3">
-              <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5 sm:mt-0 animate-pulse" />
+              <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5 sm:mt-0 animate-pulse" />
               <div>
                 <span className="font-bold block sm:inline mr-1.5">Database Exception:</span>
                 <span className="opacity-90">{error}</span>
@@ -457,13 +457,13 @@ export default function App() {
             <div className="flex gap-2">
               <button
                 onClick={() => setIsConfigOpen(true)}
-                className="text-[11px] bg-red-500/10 hover:bg-red-500/20 text-red-300 font-bold px-3 py-1.5 rounded-lg border border-red-500/20 transition cursor-pointer"
+                className="text-[11px] bg-red-900/40 hover:bg-red-800 text-red-200 font-bold px-4 py-2 rounded-lg border border-red-800/50 transition-colors cursor-pointer"
               >
                 Inspect Setup
               </button>
               <button
                 onClick={() => setError("")}
-                className="p-1.5 text-zinc-500 hover:text-zinc-300 transition"
+                className="p-2 text-zinc-500 hover:text-zinc-300 transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -471,21 +471,19 @@ export default function App() {
           </div>
         )}
 
-        {/* DOM PERSISTENCE: We render both views, but use CSS to hide the one we aren't looking at */}
-        
         {/* ================= SIMILARITY DETAIL VIEW ================= */}
         {pinterestFocus && (
-          <div className="flex flex-col gap-10 animate-in fade-in duration-500">
-            <div className="flex justify-between items-center bg-[#0A0A0A] border border-[#222] p-4">
+          <div className="flex flex-col gap-12 animate-in fade-in duration-700">
+            <div className="flex justify-between items-center bg-[#0A0A0A] border border-white/5 rounded-2xl p-3">
                <button
                  onClick={handleBackToArchive}
-                 className="px-5 py-2.5 bg-[#1A1A1A] hover:bg-[#222] text-white border border-[#333] font-bold text-[10px] uppercase tracking-widest transition"
+                 className="px-6 py-3 hover:bg-[#151515] text-white rounded-xl font-bold text-[10px] uppercase tracking-widest transition-colors"
                >
                  ← Back to Archive
                </button>
                <button
                  onClick={() => setSelectedImage(pinterestFocus)}
-                 className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-bold text-[10px] uppercase tracking-widest transition"
+                 className="px-6 py-3 bg-red-700 hover:bg-red-600 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-[0_0_15px_rgba(185,28,28,0.3)] transition-all"
                >
                  View Details & Edit
                </button>
@@ -493,52 +491,38 @@ export default function App() {
 
             <div className="flex justify-center bg-transparent">
               {pinterestFocus.contentType.startsWith("video/") ? (
-                <video src={pinterestFocus.url} className="max-h-[65vh] rounded-2xl shadow-2xl object-contain" controls autoPlay />
+                <video src={pinterestFocus.url} className="max-h-[70vh] rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] object-contain" controls autoPlay />
               ) : (
-                <img src={pinterestFocus.url} alt={pinterestFocus.name} className="max-h-[65vh] rounded-2xl shadow-2xl object-contain" />
+                <img src={pinterestFocus.url} alt={pinterestFocus.name} className="max-h-[70vh] rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] object-contain" />
               )}
             </div>
 
             {/* Similarity Grid */}
-            <div className="mt-8 border-t border-[#222] pt-8">
-              <div className="text-center mb-8">
-                <h3 className="text-xl font-bold tracking-widest uppercase italic font-serif text-white">
+            <div className="mt-8 border-t border-white/5 pt-12">
+              <div className="text-center mb-10">
+                <h3 className="text-2xl font-light tracking-[0.2em] uppercase text-white">
                   More like this
                 </h3>
-                <p className="text-xs text-neutral-500 mt-1">
-                  Based on tags and visual keywords
-                </p>
               </div>
-              <div className="columns-2 sm:columns-3 lg:columns-4 min-[1400px]:columns-5 2xl:columns-6 min-[1800px]:columns-7 gap-3 sm:gap-4 w-full">
+              
+              <div className="columns-2 sm:columns-3 lg:columns-4 min-[1400px]:columns-5 2xl:columns-6 min-[1800px]:columns-7 gap-4 w-full">
                 {similarImages.map((image: any) => (
                   <div
                     key={image.id}
                     onClick={() => handleImageClick(image)}
-                    className="break-inside-avoid mb-3 sm:mb-4 relative group rounded-2xl border border-[#222] bg-[#0A0A0A] overflow-hidden cursor-zoom-in transition-all duration-300 hover:border-neutral-500 hover:-translate-y-1"
+                    className="break-inside-avoid mb-4 relative group rounded-2xl border border-white/5 bg-[#111] overflow-hidden cursor-zoom-in transition-all duration-500 hover:border-red-700/50 hover:shadow-[0_0_30px_rgba(185,28,28,0.15)] hover:-translate-y-1"
                   >
                     {image.contentType.startsWith("video/") ? (
-                      <video 
-                        src={image.url} 
-                        className="w-full h-auto object-cover block" 
-                        muted 
-                        loop 
-                        autoPlay 
-                        playsInline 
-                      />
+                      <video src={image.url} className="w-full h-auto object-cover block" muted loop autoPlay playsInline />
                     ) : (
-                      <img 
-                        src={image.url} 
-                        alt={image.name} 
-                        className="w-full h-auto object-cover block transition-transform duration-700 group-hover:scale-[1.03]" 
-                        loading="lazy" 
-                      />
+                      <img src={image.url} alt={image.name} className="w-full h-auto object-cover block transition-transform duration-700 group-hover:scale-[1.05]" loading="lazy" />
                     )}
                     
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/15 transition-colors duration-300" />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-500" />
                     
                     {image.similarityScore >= 30 && (
-                      <div className="absolute top-3 right-3 bg-black/70 text-[10px] px-2.5 py-1 rounded-full text-orange-400 font-mono tracking-widest">
-                        Strong Match
+                      <div className="absolute top-3 right-3 bg-red-700/90 backdrop-blur-md text-[9px] px-3 py-1.5 rounded-full text-white font-mono tracking-widest border border-red-500/50 shadow-lg">
+                        Match
                       </div>
                     )}
                   </div>
@@ -546,201 +530,175 @@ export default function App() {
               </div>
               
               {similarImages.length === 0 && (
-                <p className="text-center text-neutral-500 py-12">No similar images found. Try adding more descriptive tags.</p>
+                <p className="text-center text-neutral-600 py-16 font-light tracking-wide">No similar assets found in the archive.</p>
               )}
             </div>
           </div>
         )}
 
-        {/* ================= MAIN FEED VIEW (HIDDEN IF DETAIL IS OPEN) ================= */}
-        <div className={pinterestFocus ? 'hidden' : 'flex flex-col gap-6 animate-in fade-in duration-300'}>
+        {/* ================= MAIN FEED VIEW ================= */}
+        <div className={pinterestFocus ? 'hidden' : 'flex flex-col gap-8 animate-in fade-in duration-500'}>
             
             {/* Toolbar and Filters */}
-            <div className="bg-[#0A0A0A] border border-[#222] p-6 rounded-none flex flex-col gap-5">
+            <div className="bg-[#0A0A0A] border border-white/5 p-4 sm:p-5 rounded-2xl flex flex-col gap-5">
               <div className="flex flex-col xl:flex-row items-center justify-between gap-5">
                 
+                {/* Search Box Input */}
                 <div className="relative w-full xl:max-w-md">
-                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-500" />
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search archive content..."
-                    className="w-full bg-[#0D0D0D] border border-[#333] focus:border-orange-500 hover:border-neutral-700 focus:outline-none p-3 pl-10 rounded-none text-xs text-neutral-300 tracking-wide transition font-sans"
+                    className="w-full bg-[#111] border border-transparent focus:border-red-700 focus:bg-[#151515] focus:outline-none p-3.5 pl-11 rounded-xl text-sm text-zinc-100 tracking-wide transition-all duration-300 font-sans"
                   />
                   {searchQuery && (
                     <button
                       onClick={() => setSearchQuery("")}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-orange-500 hover:text-white text-xs font-bold leading-none py-0.5 uppercase tracking-widest"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white transition-colors"
                     >
-                      Clear
+                      <X className="w-4 h-4" />
                     </button>
                   )}
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between w-full xl:w-auto gap-5">
-                  <div className="flex flex-wrap items-center gap-4 text-xs tracking-wider uppercase font-medium text-neutral-400">
-                    <span className="text-neutral-500 flex items-center gap-2 font-bold text-[10px] uppercase font-mono tracking-widest"><ArrowUpDown className="w-3.5 h-3.5 text-orange-500" /> Sort</span>
-                    
-                    <div className="flex items-center bg-[#0D0D0D] p-0.5 border border-[#333]">
-                      <button
-                        onClick={() => setSortBy('date-desc')}
-                        className={`px-3 py-1.5 text-[9px] uppercase tracking-widest font-mono transition cursor-pointer ${
-                          sortBy === 'date-desc' ? 'bg-neutral-800 text-orange-500 font-bold' : 'text-neutral-400 hover:text-white'
-                        }`}
-                      >
-                        Newest
-                      </button>
-                      <button
-                        onClick={() => setSortBy('date-asc')}
-                        className={`px-3 py-1.5 text-[9px] uppercase tracking-widest font-mono transition cursor-pointer ${
-                          sortBy === 'date-asc' ? 'bg-neutral-800 text-orange-500 font-bold' : 'text-neutral-400 hover:text-white'
-                        }`}
-                      >
-                        Oldest
-                      </button>
-                    </div>
-
-                    <div className="flex items-center bg-[#0D0D0D] p-0.5 border border-[#333]">
-                      <button
-                        onClick={() => setSortBy('name-asc')}
-                        className={`px-3 py-1.5 text-[9px] uppercase tracking-widest font-mono transition cursor-pointer ${
-                          sortBy === 'name-asc' ? 'bg-neutral-800 text-orange-500 font-bold' : 'text-neutral-400 hover:text-white'
-                        }`}
-                      >
-                        A - Z
-                      </button>
-                      <button
-                        onClick={() => setSortBy('name-desc')}
-                        className={`px-3 py-1.5 text-[9px] uppercase tracking-widest font-mono transition cursor-pointer ${
-                          sortBy === 'name-desc' ? 'bg-neutral-800 text-orange-500 font-bold' : 'text-neutral-400 hover:text-white'
-                        }`}
-                      >
-                        Z - A
-                      </button>
-                    </div>
+                <div className="flex flex-wrap items-center justify-between w-full xl:w-auto gap-4">
+                  
+                  {/* Media Type Filter */}
+                  <div className="flex items-center bg-[#111] p-1 border border-white/5 rounded-xl">
+                    <button
+                      onClick={() => setMediaFilter('all')}
+                      className={`px-4 py-2 rounded-lg text-[10px] font-bold tracking-widest uppercase transition-all duration-300 ${mediaFilter === 'all' ? 'bg-[#222] text-white shadow-md' : 'text-neutral-500 hover:text-white'}`}
+                    >
+                      All
+                    </button>
+                    <button
+                      onClick={() => setMediaFilter('image')}
+                      className={`px-4 py-2 rounded-lg text-[10px] font-bold tracking-widest uppercase transition-all duration-300 flex items-center gap-1.5 ${mediaFilter === 'image' ? 'bg-[#222] text-white shadow-md' : 'text-neutral-500 hover:text-white'}`}
+                    >
+                      <ImageIcon className="w-3 h-3" /> Images
+                    </button>
+                    <button
+                      onClick={() => setMediaFilter('video')}
+                      className={`px-4 py-2 rounded-lg text-[10px] font-bold tracking-widest uppercase transition-all duration-300 flex items-center gap-1.5 ${mediaFilter === 'video' ? 'bg-[#222] text-white shadow-md' : 'text-neutral-500 hover:text-white'}`}
+                    >
+                      <Film className="w-3 h-3" /> Videos
+                    </button>
                   </div>
 
-                  <div className="bg-[#0D0D0D] p-1 border border-[#333] flex items-center">
+                  {/* Sort Selection Controls */}
+                  <div className="flex items-center bg-[#111] p-1 border border-white/5 rounded-xl">
+                    <div className="flex items-center px-3 text-neutral-500">
+                      <ArrowUpDown className="w-3.5 h-3.5" />
+                    </div>
+                    <button
+                      onClick={() => setSortBy('date-desc')}
+                      className={`px-3 py-2 rounded-lg text-[10px] font-bold tracking-widest uppercase transition-all duration-300 ${sortBy === 'date-desc' ? 'bg-[#222] text-red-500 shadow-md' : 'text-neutral-500 hover:text-white'}`}
+                    >
+                      New
+                    </button>
+                    <button
+                      onClick={() => setSortBy('date-asc')}
+                      className={`px-3 py-2 rounded-lg text-[10px] font-bold tracking-widest uppercase transition-all duration-300 ${sortBy === 'date-asc' ? 'bg-[#222] text-red-500 shadow-md' : 'text-neutral-500 hover:text-white'}`}
+                    >
+                      Old
+                    </button>
+                    <button
+                      onClick={() => setSortBy('name-asc')}
+                      className={`px-3 py-2 rounded-lg text-[10px] font-bold tracking-widest uppercase transition-all duration-300 ${sortBy === 'name-asc' ? 'bg-[#222] text-red-500 shadow-md' : 'text-neutral-500 hover:text-white'}`}
+                    >
+                      A-Z
+                    </button>
+                  </div>
+
+                  {/* Layout Mode Selectors */}
+                  <div className="bg-[#111] p-1 border border-white/5 flex items-center rounded-xl">
                     <button
                       onClick={() => setLayoutMode('masonry')}
-                      className={`p-1.5 px-3 rounded-none text-[10px] uppercase tracking-widest font-semibold flex items-center gap-2 transition select-none ${
-                        layoutMode === 'masonry' ? 'bg-neutral-800 text-orange-500 font-bold' : 'text-neutral-500 hover:text-white'
-                      }`}
-                      title="Pinterest layout"
+                      className={`p-2 px-3 rounded-lg text-[10px] font-bold tracking-widest uppercase transition-all duration-300 flex items-center gap-2 ${layoutMode === 'masonry' ? 'bg-[#222] text-red-500 shadow-md' : 'text-neutral-500 hover:text-white'}`}
                     >
-                      <Columns className="w-3.5 h-3.5 text-neutral-400" />
-                      <span className="hidden sm:inline">Pinterest</span>
+                      <Columns className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Flow</span>
                     </button>
-
                     <button
                       onClick={() => setLayoutMode('grid')}
-                      className={`p-1.5 px-3 rounded-none text-[10px] uppercase tracking-widest font-semibold flex items-center gap-2 transition select-none ${
-                        layoutMode === 'grid' ? 'bg-neutral-800 text-orange-500 font-bold' : 'text-neutral-500 hover:text-white'
-                      }`}
-                      title="Strict Grid ratio"
+                      className={`p-2 px-3 rounded-lg text-[10px] font-bold tracking-widest uppercase transition-all duration-300 flex items-center gap-2 ${layoutMode === 'grid' ? 'bg-[#222] text-red-500 shadow-md' : 'text-neutral-500 hover:text-white'}`}
                     >
-                      <Grid className="w-3.5 h-3.5 text-neutral-400" />
+                      <Grid className="w-3.5 h-3.5" />
                       <span className="hidden sm:inline">Grid</span>
                     </button>
-
                     <button
                       onClick={() => setLayoutMode('list')}
-                      className={`p-1.5 px-3 rounded-none text-[10px] uppercase tracking-widest font-semibold flex items-center gap-2 transition select-none ${
-                        layoutMode === 'list' ? 'bg-neutral-800 text-orange-500 font-bold' : 'text-neutral-500 hover:text-white'
-                      }`}
-                      title="Spread list columns"
+                      className={`p-2 px-3 rounded-lg text-[10px] font-bold tracking-widest uppercase transition-all duration-300 flex items-center gap-2 ${layoutMode === 'list' ? 'bg-[#222] text-red-500 shadow-md' : 'text-neutral-500 hover:text-white'}`}
                     >
-                      <List className="w-3.5 h-3.5 text-neutral-400" />
-                      <span className="hidden sm:inline">Details</span>
+                      <List className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">List</span>
                     </button>
                   </div>
 
+                  {/* Sync Button */}
                   <button
                     onClick={handleRefresh}
                     disabled={loading}
-                    className="p-2.5 px-3.5 bg-[#0D0D0D] hover:bg-neutral-950 border border-[#333] text-[#E0E0E0] hover:text-white transition flex items-center justify-center gap-2 text-[10px] uppercase tracking-[0.2em] font-bold cursor-pointer"
+                    className="p-2.5 bg-[#111] hover:bg-[#222] border border-white/5 text-neutral-400 hover:text-white transition-all duration-300 rounded-xl flex items-center justify-center cursor-pointer"
                     title="Reload files from Storage"
                   >
-                    <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-orange-500' : ''}`} />
-                    <span>Sync</span>
+                    <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-red-500' : ''}`} />
                   </button>
                 </div>
               </div>
             </div>
 
             {loading && images.length === 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 min-[1400px]:grid-cols-5 2xl:grid-cols-6 min-[1800px]:grid-cols-7 gap-3 sm:gap-4 py-6 font-sans w-full">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 min-[1400px]:grid-cols-5 2xl:grid-cols-6 min-[1800px]:grid-cols-7 gap-4 py-6 w-full">
                 {Array.from({ length: 14 }).map((_, idx) => (
-                  <div 
-                    key={idx} 
-                    className="bg-[#0A0A0A] border border-[#222] rounded-none h-[280px] w-full flex flex-col gap-4 p-4 overflow-hidden animate-pulse"
-                  >
-                    <div className="flex-1 bg-neutral-900 rounded-none w-full" />
-                    <div className="h-4 bg-neutral-900 rounded-none w-2/3" />
-                    <div className="flex gap-2">
-                      <div className="h-3.5 bg-neutral-900 rounded-none w-1/4" />
-                      <div className="h-3.5 bg-neutral-900 rounded-none w-1/4" />
-                    </div>
-                  </div>
+                  <div key={idx} className="bg-[#0A0A0A] border border-white/5 rounded-2xl h-[300px] w-full animate-pulse" />
                 ))}
               </div>
             ) : filteredAndSortedImages.length === 0 ? (
-              <div className="py-24 border border-dashed border-[#333] bg-[#0A0A0A] flex flex-col items-center justify-center text-center gap-5 rounded-none">
-                <div className="p-5 bg-[#0D0D0D] border border-[#222] text-neutral-500 rounded-none">
-                  <FolderOpen className="w-8 h-8 text-orange-500" />
+              <div className="py-32 flex flex-col items-center justify-center text-center gap-5 rounded-3xl border border-white/5 bg-[#0A0A0A]">
+                <div className="p-6 bg-[#111] rounded-full">
+                  <FolderOpen className="w-10 h-10 text-red-700" />
                 </div>
-                <div className="space-y-1.5">
-                  <h3 className="text-xl font-light font-serif text-white tracking-wide">Archive Empty</h3>
-                  <p className="text-xs text-neutral-400 max-w-sm leading-relaxed">
-                    We couldn't locate any items matching your current criteria. Filter differently or upload a new record to Vantage.Archive.
+                <div className="space-y-2">
+                  <h3 className="text-2xl font-light tracking-wide text-white">Archive Empty</h3>
+                  <p className="text-sm text-neutral-500 max-w-sm leading-relaxed">
+                    We couldn't locate any items matching your current filters. Adjust your search or upload new assets.
                   </p>
                 </div>
-                <div className="flex gap-3 text-xs mt-3">
+                <div className="flex gap-4 mt-6">
                   <button
-                    onClick={() => setSearchQuery("")}
-                    className="px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 rounded-none transition border border-[#333] cursor-pointer font-bold uppercase tracking-widest text-[10px]"
+                    onClick={() => { setSearchQuery(""); setMediaFilter('all'); }}
+                    className="px-6 py-3 bg-[#111] hover:bg-[#222] text-white rounded-xl transition-colors font-bold uppercase tracking-widest text-[10px]"
                   >
                     Clear Filters
                   </button>
                   <button
                     onClick={() => setIsUploadOpen(true)}
-                    className="px-5 py-2.5 bg-white text-black font-bold rounded-none transition cursor-pointer hover:bg-orange-500 hover:text-white uppercase tracking-widest text-[10px]"
+                    className="px-6 py-3 bg-red-700 text-white font-bold rounded-xl transition-all hover:bg-red-600 uppercase tracking-widest text-[10px] shadow-[0_0_15px_rgba(185,28,28,0.3)]"
                   >
-                    Upload First File
+                    Upload Asset
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="py-2.5">
+              <div className="py-2">
                 {layoutMode === 'masonry' && (
-                  <div className="columns-2 sm:columns-3 lg:columns-4 min-[1400px]:columns-5 2xl:columns-6 min-[1800px]:columns-7 gap-3 sm:gap-4 w-full">
+                  <div className="columns-2 sm:columns-3 lg:columns-4 min-[1400px]:columns-5 2xl:columns-6 min-[1800px]:columns-7 gap-4 w-full">
                     {filteredAndSortedImages.map((image) => (
                       <div
                          key={image.id}
                          onClick={() => handleImageClick(image)}
-                         className="break-inside-avoid mb-3 sm:mb-4 relative group rounded-2xl border border-[#222] bg-[#0A0A0A] overflow-hidden cursor-zoom-in shadow-none transition-all duration-300 hover:border-neutral-500 flex flex-col hover:shadow-[0_8px_30px_rgb(0,0,0,0.5)] hover:-translate-y-1"
+                         className="break-inside-avoid mb-4 relative group rounded-2xl border border-white/5 bg-[#111] overflow-hidden cursor-zoom-in transition-all duration-500 hover:border-red-700/50 hover:shadow-[0_0_30px_rgba(185,28,28,0.15)] hover:-translate-y-1"
                       >
-                         <div className="relative overflow-hidden w-full bg-neutral-900">
+                         <div className="relative overflow-hidden w-full h-full">
                            {image.contentType.startsWith("video/") ? (
-                             <video
-                               src={image.url}
-                               className="w-full h-auto object-cover block"
-                               muted
-                               loop
-                               playsInline
-                               autoPlay
-                             />
+                             <video src={image.url} className="w-full h-auto object-cover block" muted loop playsInline autoPlay />
                            ) : (
-                             <img
-                               src={image.url}
-                               alt={image.name}
-                               className="w-full h-auto object-cover block transition-transform duration-700 group-hover:scale-[1.03]"
-                               loading="lazy"
-                               referrerPolicy="no-referrer"
-                             />
+                             <img src={image.url} alt={image.name} className="w-full h-auto object-cover block transition-transform duration-700 group-hover:scale-[1.05]" loading="lazy" />
                            )}
-                           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/15 transition-colors duration-300" />
+                           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-500" />
                          </div>
                       </div>
                     ))}
@@ -748,80 +706,52 @@ export default function App() {
                 )}
 
                 {layoutMode === 'grid' && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 min-[1400px]:grid-cols-5 2xl:grid-cols-6 min-[1800px]:grid-cols-7 gap-3 sm:gap-4 w-full">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 min-[1400px]:grid-cols-5 2xl:grid-cols-6 min-[1800px]:grid-cols-7 gap-4 w-full">
                     {filteredAndSortedImages.map((image) => (
                       <div
                         key={image.id}
                         onClick={() => handleImageClick(image)}
-                        className="relative group rounded-none border border-[#222] bg-[#0A0A0A] overflow-hidden cursor-zoom-in shadow-none transition duration-350 hover:border-neutral-500 aspect-square flex flex-col justify-end"
+                        className="relative group rounded-2xl border border-white/5 bg-[#111] overflow-hidden cursor-zoom-in transition-all duration-500 hover:border-red-700/50 hover:shadow-[0_0_30px_rgba(185,28,28,0.15)] aspect-square"
                       >
                         {image.contentType.startsWith("video/") ? (
-                          <video
-                            src={image.url}
-                            className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                            muted
-                            loop
-                            playsInline
-                            autoPlay
-                          />
+                          <video src={image.url} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" muted loop playsInline autoPlay />
                         ) : (
-                          <img
-                            src={image.url}
-                            alt={image.name}
-                            className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                            loading="lazy"
-                            referrerPolicy="no-referrer"
-                          />
+                          <img src={image.url} alt={image.name} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" loading="lazy" />
                         )}
-
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/25 to-transparent transition-all duration-300 opacity-0 group-hover:opacity-100" />
-
-                        <div className="relative p-5 flex flex-col gap-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                          <div className="flex items-center justify-between text-[10px] font-mono text-orange-500 tracking-wider">
-                            <span>{formatFileSize(image.size)}</span>
-                            <span>{image.contentType.split('/')[1]?.toUpperCase()}</span>
-                          </div>
-                          <h4 className="text-sm font-medium text-white transition truncate">{image.name}</h4>
-                        </div>
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-500" />
                       </div>
                     ))}
                   </div>
                 )}
 
                 {layoutMode === 'list' && (
-                  <div className="flex flex-col gap-3.5">
+                  <div className="flex flex-col gap-4">
                     {filteredAndSortedImages.map((image) => (
                       <div
                         key={image.id}
                         onClick={() => handleImageClick(image)}
-                        className="group rounded-none border border-[#222] bg-[#0A0A0A] p-4 hover:bg-[#151515] hover:border-neutral-700 cursor-zoom-in transition flex gap-5 items-center overflow-hidden"
+                        className="group rounded-2xl border border-white/5 bg-[#0A0A0A] p-4 hover:bg-[#111] hover:border-red-700/50 cursor-zoom-in transition-all duration-300 flex gap-6 items-center overflow-hidden"
                       >
-                        <div className="w-16 h-16 rounded-none overflow-hidden bg-neutral-900 border border-[#222] flex-shrink-0 flex items-center justify-center">
+                        <div className="w-20 h-20 rounded-xl overflow-hidden bg-neutral-900 border border-white/5 flex-shrink-0 flex items-center justify-center">
                           {image.contentType.startsWith("video/") ? (
-                            <video
-                              src={image.url}
-                              className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
-                              muted
-                            />
+                            <video src={image.url} className="w-full h-full object-cover group-hover:scale-110 transition duration-700" muted />
                           ) : (
-                            <img
-                              src={image.url}
-                              alt={image.name}
-                              className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
-                              loading="lazy"
-                              referrerPolicy="no-referrer"
-                            />
+                            <img src={image.url} alt={image.name} className="w-full h-full object-cover group-hover:scale-110 transition duration-700" loading="lazy" />
                           )}
                         </div>
 
-                        <div className="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+                        <div className="flex-1 min-w-0 grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
                           <div className="md:col-span-2">
-                            <h4 className="text-sm font-medium text-white group-hover:text-orange-400 transition truncate font-sans">{image.name}</h4>
+                            <h4 className="text-base font-medium text-white group-hover:text-red-500 transition-colors truncate">{image.name}</h4>
+                            <p className="text-xs text-neutral-500 mt-1 truncate">{image.description || 'No description provided'}</p>
                           </div>
 
-                          <div className="hidden sm:block text-xs font-mono text-neutral-400 md:text-right">
-                            <p className="text-[8px] text-neutral-500 uppercase tracking-[0.2em] font-sans font-bold mb-0.5">Specifications</p>
-                            <span>{formatFileSize(image.size)} • {image.contentType.split('/')[1]?.toUpperCase()}</span>
+                          <div className="hidden sm:flex flex-col md:items-end gap-1">
+                            <div className="flex gap-2">
+                              {image.contentType.startsWith("video/") ? <Film className="w-3.5 h-3.5 text-red-700" /> : <ImageIcon className="w-3.5 h-3.5 text-red-700" />}
+                              <span className="text-[10px] text-neutral-400 font-mono uppercase tracking-widest">{image.contentType.split('/')[1]?.toUpperCase()}</span>
+                            </div>
+                            <span className="text-[10px] text-neutral-600 font-mono uppercase tracking-widest">{formatFileSize(image.size)}</span>
                           </div>
                         </div>
                       </div>
