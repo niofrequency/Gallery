@@ -1,13 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ALL_AVAILABLE_TAGS } from '../demoData';
-import { UploadCloud, X, PlusCircle, Sparkles, Image as ImageIcon } from 'lucide-react';
+import { UploadCloud, X, PlusCircle, Sparkles, Image as ImageIcon, Film } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface ImageUploadModalProps {
   isOpen: boolean;
   onClose: () => void;
   onUpload: (
-    file: File, 
+    files: File[], 
     metadata: { name: string; description: string; tags: string[] }
   ) => Promise<void>;
 }
@@ -17,8 +17,8 @@ export default function ImageUploadModal({
   onClose,
   onUpload
 }: ImageUploadModalProps) {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string>("");
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -33,8 +33,9 @@ export default function ImageUploadModal({
 
   useEffect(() => {
     if (!isOpen) {
-      setSelectedFile(null);
-      setPreviewUrl("");
+      setSelectedFiles([]);
+      previewUrls.forEach(url => URL.revokeObjectURL(url));
+      setPreviewUrls([]);
       setName("");
       setDescription("");
       setSelectedTags([]);
@@ -43,17 +44,40 @@ export default function ImageUploadModal({
       setUploadProgress(0);
       setErrorMsg("");
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
-  const handleFileChange = (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      setErrorMsg("Please select an image file.");
+  const handleFilesChange = (files: FileList | File[]) => {
+    const fileArray = Array.from(files).filter(file => 
+      file.type.startsWith('image/') || file.type.startsWith('video/')
+    );
+
+    if (fileArray.length === 0) {
+      setErrorMsg("Please select valid image or video files.");
       return;
     }
+
     setErrorMsg("");
-    setSelectedFile(file);
-    setName(file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " "));
-    setPreviewUrl(URL.createObjectURL(file));
+    
+    setSelectedFiles(prev => [...prev, ...fileArray]);
+    
+    const newUrls = fileArray.map(f => URL.createObjectURL(f));
+    setPreviewUrls(prev => [...prev, ...newUrls]);
+
+    // Auto-fill name if it's the first file and name is empty
+    if (!name && fileArray.length === 1) {
+      setName(fileArray[0].name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " "));
+    } else if (!name && fileArray.length > 1) {
+      setName("Batch Upload");
+    }
+  };
+
+  const removeFile = (indexToRemove: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== indexToRemove));
+    setPreviewUrls(prev => {
+      URL.revokeObjectURL(prev[indexToRemove]);
+      return prev.filter((_, i) => i !== indexToRemove);
+    });
   };
 
   const handleDrag = (e: React.DragEvent) => {
@@ -70,8 +94,8 @@ export default function ImageUploadModal({
     e.preventDefault();
     e.stopPropagation();
     setIsDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFileChange(e.dataTransfer.files[0]);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFilesChange(e.dataTransfer.files);
     }
   };
 
@@ -100,8 +124,8 @@ export default function ImageUploadModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedFile) {
-      setErrorMsg("Please select an image file to upload.");
+    if (selectedFiles.length === 0) {
+      setErrorMsg("Please select at least one file to upload.");
       return;
     }
 
@@ -120,8 +144,8 @@ export default function ImageUploadModal({
     }, 120);
 
     try {
-      await onUpload(selectedFile, {
-        name: name || selectedFile.name,
+      await onUpload(selectedFiles, {
+        name: name || "Untitled Asset",
         description,
         tags: selectedTags
       });
@@ -183,7 +207,7 @@ export default function ImageUploadModal({
             {/* Form */}
             <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
               {/* Image Drag Zone */}
-              {!selectedFile ? (
+              {selectedFiles.length === 0 ? (
                 <div
                   id="dropzone"
                   onDragEnter={handleDrag}
@@ -199,43 +223,71 @@ export default function ImageUploadModal({
                 >
                   <input
                     type="file"
+                    multiple
+                    accept="image/*,video/*"
                     ref={fileInputRef}
-                    onChange={(e) => e.target.files && handleFileChange(e.target.files[0])}
+                    onChange={(e) => e.target.files && handleFilesChange(e.target.files)}
                     className="hidden"
-                    accept="image/*"
                   />
                   <div className="p-3 bg-[#111] border border-[#222] rounded-none text-neutral-400 group-hover:text-orange-500 transition-colors">
                     <UploadCloud className="w-5 h-5" />
                   </div>
                   <div className="text-center space-y-1">
                     <p className="text-xs font-semibold text-neutral-300">
-                      Drag and drop image, or <span className="text-orange-500 font-bold underline decoration-orange-500/30 group-hover:decoration-orange-500">browse file directory</span>
+                      Drag and drop files, or <span className="text-orange-500 font-bold underline decoration-orange-500/30 group-hover:decoration-orange-500">browse file directory</span>
                     </p>
-                    <p className="text-[9px] text-neutral-500 uppercase tracking-widest font-mono">PNG, JPEG, WEBP, GIF (MAX 10MB)</p>
+                    <p className="text-[9px] text-neutral-500 uppercase tracking-widest font-mono">PNG, JPEG, WEBP, MP4 (MULTIPLE ALLOWED)</p>
                   </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-                  {/* Miniature Preview */}
+                  {/* Miniature Previews Grid */}
                   <div className="md:col-span-2 flex flex-col gap-2.5">
-                    <span className="text-[10px] uppercase font-mono tracking-widest text-[#888]">Asset Preview</span>
-                    <div className="relative aspect-square w-full rounded-none border border-[#222] bg-[#0A0A0A] overflow-hidden flex items-center justify-center p-2">
-                      <img 
-                        src={previewUrl} 
-                        alt="Upload preview" 
-                        className="object-contain w-full h-full max-h-[180px]"
-                        referrerPolicy="no-referrer"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedFile(null);
-                          setPreviewUrl("");
-                        }}
-                        className="absolute top-2.5 right-2.5 p-1.5 bg-[#151515] border border-[#333] text-white hover:border-neutral-500 rounded-none transition"
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] uppercase font-mono tracking-widest text-[#888]">Asset Preview ({selectedFiles.length})</span>
+                      <button 
+                        type="button" 
+                        onClick={triggerFileInput}
+                        className="text-[9px] text-orange-500 hover:text-white uppercase font-mono tracking-widest transition"
                       >
-                        <X className="w-3 h-3 text-orange-500" />
+                        + Add More
                       </button>
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*,video/*"
+                        ref={fileInputRef}
+                        onChange={(e) => e.target.files && handleFilesChange(e.target.files)}
+                        className="hidden"
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2 max-h-[220px] overflow-y-auto pr-1">
+                      {previewUrls.map((url, idx) => (
+                        <div key={idx} className="relative aspect-square w-full rounded-none border border-[#222] bg-[#0A0A0A] overflow-hidden flex items-center justify-center p-1 group">
+                          {selectedFiles[idx].type.startsWith("video/") ? (
+                            <>
+                              <Film className="absolute z-10 w-4 h-4 text-white/70" />
+                              <video src={url} className="object-cover w-full h-full opacity-60" />
+                            </>
+                          ) : (
+                            <img 
+                              src={url} 
+                              alt={`preview-${idx}`} 
+                              className="object-cover w-full h-full"
+                              referrerPolicy="no-referrer"
+                            />
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => removeFile(idx)}
+                            disabled={isUploading}
+                            className="absolute top-1 right-1 p-1 bg-[#151515]/90 backdrop-blur-sm border border-[#333] text-white hover:border-red-500 hover:text-red-500 rounded-none transition opacity-0 group-hover:opacity-100"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
@@ -248,7 +300,7 @@ export default function ImageUploadModal({
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         className="w-full bg-[#0D0D0D] border border-[#333] hover:border-neutral-700 focus:border-orange-500 focus:outline-none p-3 rounded-none text-zinc-100 font-mono"
-                        placeholder="Meadow Composition"
+                        placeholder="Batch Title or Individual Name"
                         required
                         disabled={isUploading}
                       />
@@ -270,7 +322,7 @@ export default function ImageUploadModal({
               )}
 
               {/* Tag Pickers */}
-              {selectedFile && (
+              {selectedFiles.length > 0 && (
                 <div className="flex flex-col gap-3">
                   <span className="text-[10px] uppercase tracking-widest text-[#888] font-mono">Classify with Tags</span>
                   
@@ -355,7 +407,7 @@ export default function ImageUploadModal({
                   <div className="flex justify-between text-[10px] font-mono text-neutral-400 font-medium uppercase tracking-wider">
                     <span className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse" />
-                      Uploading composition file...
+                      Uploading {selectedFiles.length} file{selectedFiles.length > 1 ? 's' : ''}...
                     </span>
                     <span>{uploadProgress}%</span>
                   </div>
@@ -380,14 +432,14 @@ export default function ImageUploadModal({
                 </button>
                 <button
                   type="submit"
-                  disabled={!selectedFile || isUploading}
+                  disabled={selectedFiles.length === 0 || isUploading}
                   className={`px-6 py-3 font-bold transition rounded-none text-[10px] tracking-[0.2em] uppercase ${
-                    selectedFile && !isUploading
+                    selectedFiles.length > 0 && !isUploading
                       ? 'bg-white text-black hover:bg-orange-500 hover:text-white cursor-pointer shadow-none'
                       : 'bg-[#151515] text-neutral-600 border border-[#222] cursor-not-allowed'
                   }`}
                 >
-                  {isUploading ? 'Transferring...' : 'Submit File'}
+                  {isUploading ? 'Transferring...' : 'Submit Files'}
                 </button>
               </div>
             </form>
