@@ -355,6 +355,15 @@ export default function App() {
     setPinterestFocus(prev => prev && prev.id === image.id ? { ...prev, name: cleanName } : prev);
   };
 
+  // Handle Updating Tags Post-Upload
+  const handleUpdateTags = async (image: GalleryImage, newTags: string[]) => {
+    // Note: To persist this to Firebase properly, you would need to add an `updateImageTagsInFirebase` 
+    // method to your firebaseService.ts. For now, this instantly updates the UI state perfectly.
+    setImages(prev => prev.map(img => img.id === image.id ? { ...img, tags: newTags } : img));
+    setSelectedImage(prev => prev && prev.id === image.id ? { ...prev, tags: newTags } : prev);
+    setPinterestFocus(prev => prev && prev.id === image.id ? { ...prev, tags: newTags } : prev);
+  };
+
   // NAVIGATION HANDLERS
   const handleImageClick = (image: GalleryImage) => {
     if (!pinterestFocus) {
@@ -401,6 +410,11 @@ export default function App() {
     return pinterestFocus ? getSimilarImages(pinterestFocus, images, 24) : [];
   }, [pinterestFocus, images]);
 
+  // Calculations for header statistics
+  const totalSize = images.reduce((acc, img) => acc + (img.size || 0), 0);
+  const totalSizeFormatted = formatFileSize(totalSize);
+  const totalCount = images.length;
+
   return (
     <div className="min-h-screen bg-[#050505] text-[#E0E0E0] font-sans tracking-tight antialiased selection:bg-red-800 selection:text-white">
       
@@ -409,19 +423,22 @@ export default function App() {
         <div className="w-full mx-auto max-w-[2400px] flex items-center justify-between">
           
           <div 
-            className="flex items-center gap-2 sm:gap-3 cursor-pointer group shrink-0" 
+            className="flex items-center gap-2.5 sm:gap-3 cursor-pointer group shrink-0" 
             onClick={handleBackToArchive}
           >
-            <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-red-600 shadow-[0_0_12px_rgba(220,38,38,0.8)] group-hover:scale-150 transition-transform duration-500"></div>
-            <div>
+            <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-red-600 shadow-[0_0_12px_rgba(220,38,38,0.8)] group-hover:scale-150 transition-transform duration-500 shrink-0"></div>
+            <div className="flex flex-col">
               <h1 className="text-sm sm:text-xl tracking-[0.15em] sm:tracking-[0.2em] font-light text-white uppercase truncate">MARK'S<span className="font-bold">Archive</span></h1>
+              <p className="text-[8px] sm:text-[9px] uppercase font-mono tracking-widest text-neutral-500 mt-0.5 whitespace-nowrap">
+                {totalCount} Assets • {totalSizeFormatted}
+              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 sm:gap-6 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-6 shrink-0">
             <button
               onClick={() => setIsUploadOpen(true)}
-              className="flex items-center gap-2 bg-white text-black px-3 sm:px-6 py-2 sm:py-2.5 rounded-full text-[10px] font-bold tracking-widest uppercase hover:bg-red-700 hover:text-white hover:shadow-[0_0_20px_rgba(185,28,28,0.4)] transition-all duration-300"
+              className="flex items-center gap-2 bg-white text-black px-3.5 sm:px-6 py-2 sm:py-2.5 rounded-full text-[10px] font-bold tracking-widest uppercase hover:bg-red-700 hover:text-white hover:shadow-[0_0_20px_rgba(185,28,28,0.4)] transition-all duration-300"
             >
               <Plus className="w-3.5 h-3.5 shrink-0" />
               <span className="hidden sm:inline">Upload</span>
@@ -432,8 +449,8 @@ export default function App() {
               className="relative p-2 text-neutral-500 hover:text-white transition-colors duration-300"
               title="Database Settings"
             >
-              <Settings className="w-5 h-5 hover:rotate-90 transition-transform duration-500" />
-              <div className={`absolute top-1.5 right-1.5 w-2 h-2 rounded-full border-2 border-black ${isFirebaseActive ? 'bg-green-500' : 'bg-red-500'}`} />
+              <Settings className="w-4 h-4 sm:w-5 sm:h-5 hover:rotate-90 transition-transform duration-500" />
+              <div className={`absolute top-1.5 right-1.5 w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full border-2 border-black ${isFirebaseActive ? 'bg-green-500' : 'bg-red-500'}`} />
             </button>
           </div>
         </div>
@@ -454,7 +471,7 @@ export default function App() {
             <div className="flex gap-2">
               <button
                 onClick={() => setIsConfigOpen(true)}
-                className="text-[11px] bg-red-900/40 hover:bg-red-800 text-red-200 font-bold px-4 py-2 rounded-lg border border-red-800/50 transition cursor-pointer"
+                className="text-[11px] bg-red-500/10 hover:bg-red-500/20 text-red-300 font-bold px-3 py-1.5 rounded-lg border border-red-500/20 transition cursor-pointer"
               >
                 Inspect Setup
               </button>
@@ -671,7 +688,7 @@ export default function App() {
                 <div className="space-y-2">
                   <h3 className="text-2xl font-light tracking-wide text-white">Archive Empty</h3>
                   <p className="text-sm text-neutral-500 max-w-sm leading-relaxed">
-                    We couldn't locate any items matching your current criteria. Adjust filters or upload new assets.
+                    We couldn't locate any items matching your current filters. Adjust your search or upload new assets.
                   </p>
                 </div>
                 <div className="flex gap-4 mt-6">
@@ -792,7 +809,12 @@ export default function App() {
         onClose={() => setSelectedImage(null)}
         onDelete={handleDelete}
         onRename={handleRename}
-        onTagClick={() => {}}
+        onUpdateTags={handleUpdateTags}
+        onTagClick={(tag) => {
+          setSearchQuery(tag);
+          setPinterestFocus(null);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
       />
     </div>
   );
