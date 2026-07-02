@@ -10,6 +10,7 @@ interface ImageDetailsModalProps {
   onClose: () => void;
   onDelete: (image: GalleryImage) => Promise<void>;
   onRename: (image: GalleryImage, newName: string) => Promise<void>;
+  onUpdateTags?: (image: GalleryImage, newTags: string[]) => Promise<void>;
   onTagClick?: (tag: string) => void;
 }
 
@@ -19,6 +20,7 @@ export default function ImageDetailsModal({
   onClose,
   onDelete,
   onRename,
+  onUpdateTags,
   onTagClick
 }: ImageDetailsModalProps) {
   const [copiedUrl, setCopiedUrl] = useState(false);
@@ -31,13 +33,22 @@ export default function ImageDetailsModal({
   const [editedName, setEditedName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
+  // States for tag editing
+  const [isEditingTags, setIsEditingTags] = useState(false);
+  const [editedTags, setEditedTags] = useState<string[]>([]);
+  const [customTagInput, setCustomTagInput] = useState("");
+  const [isSavingTags, setIsSavingTags] = useState(false);
+
   // Keep state in sync with selected image
   useEffect(() => {
     if (image) {
       setEditedName(image.name);
       setIsEditing(false);
+      setEditedTags(image.tags || []);
+      setIsEditingTags(false);
+      setCustomTagInput("");
     }
-  }, [image?.id]);
+  }, [image]);
 
   if (!image) return null;
 
@@ -54,6 +65,22 @@ export default function ImageDetailsModal({
       alert("Failed to rename resource. Please verify Firebase permissions.");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSaveTags = async () => {
+    if (!onUpdateTags) {
+      setIsEditingTags(false);
+      return;
+    }
+    setIsSavingTags(true);
+    try {
+      await onUpdateTags(image, editedTags);
+      setIsEditingTags(false);
+    } catch (err) {
+      alert("Failed to update tags.");
+    } finally {
+      setIsSavingTags(false);
     }
   };
 
@@ -116,22 +143,22 @@ export default function ImageDetailsModal({
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.98, opacity: 0 }}
             transition={{ type: "spring", damping: 28, stiffness: 320 }}
-            className="relative bg-[#0D0D0D] border border-[#222] text-[#E0E0E0] rounded-none shadow-none w-full max-w-5xl overflow-hidden z-50 flex flex-col md:flex-row h-[90vh] md:h-[80vh]"
+            className="relative bg-[#0D0D0D] border border-white/5 text-[#E0E0E0] rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.8)] w-full max-w-5xl overflow-hidden z-50 flex flex-col md:flex-row h-[90vh] md:h-[80vh]"
           >
             {/* Close trigger button */}
             <button
               onClick={onClose}
-              className="absolute top-4 right-4 z-10 p-2 bg-black/60 hover:bg-neutral-900 border border-[#222] text-neutral-350 hover:text-white transition rounded-none uppercase font-mono text-[10px] tracking-widest"
+              className="absolute top-4 right-4 z-10 p-2 bg-black/60 hover:bg-neutral-900 border border-white/10 text-neutral-300 hover:text-white transition rounded-full uppercase font-mono text-[10px] tracking-widest backdrop-blur-md"
             >
-              <X className="w-4 h-4 text-orange-500" />
+              <X className="w-5 h-5 text-red-500" />
             </button>
 
             {/* Left Column: Huge High-Quality Visual Showcase */}
-            <div className="flex-1 bg-black relative flex items-center justify-center overflow-hidden h-[40vh] md:h-full p-6 border-b md:border-b-0 md:border-r border-[#222]">
+            <div className="flex-1 bg-black relative flex items-center justify-center overflow-hidden h-[40vh] md:h-full p-6 border-b md:border-b-0 md:border-r border-white/5">
               {image.contentType.startsWith("video/") ? (
                 <video
                   src={image.url}
-                  className="object-contain w-full h-full max-h-[35vh] md:max-h-full pointer-events-auto"
+                  className="object-contain w-full h-full max-h-[35vh] md:max-h-full pointer-events-auto rounded-xl"
                   controls
                   autoPlay
                   loop
@@ -141,11 +168,11 @@ export default function ImageDetailsModal({
                 <img
                   src={image.url}
                   alt={image.name}
-                  className="object-contain w-full h-full max-h-[35vh] md:max-h-full pointer-events-auto"
+                  className="object-contain w-full h-full max-h-[35vh] md:max-h-full pointer-events-auto rounded-xl"
                   referrerPolicy="no-referrer"
                 />
               )}
-              <div className="absolute bottom-4 left-4 p-2 bg-[#0A0A0A] text-[9px] uppercase tracking-widest font-mono rounded-none px-3 border border-[#222] flex items-center gap-2">
+              <div className="absolute bottom-4 left-4 p-2 bg-[#0A0A0A]/80 backdrop-blur-md text-[9px] uppercase tracking-widest font-mono rounded-lg px-3 border border-white/5 flex items-center gap-2">
                 <span>Ratio: {image.aspectRatio.toFixed(2)}</span>
               </div>
             </div>
@@ -168,7 +195,7 @@ export default function ImageDetailsModal({
                             setIsEditing(false);
                           }
                         }}
-                        className="w-full bg-[#111] border border-[#333] focus:border-orange-500 focus:outline-none p-2 px-3 text-white font-sans text-xs uppercase tracking-wider font-semibold rounded-none"
+                        className="w-full bg-[#111] border border-[#333] focus:border-red-700 focus:outline-none p-2 px-3 text-white font-sans text-xs uppercase tracking-wider font-semibold rounded-lg"
                         placeholder="RENAME RECORD"
                         autoFocus
                         disabled={isSaving}
@@ -177,7 +204,7 @@ export default function ImageDetailsModal({
                         <button
                           onClick={handleSaveRename}
                           disabled={isSaving || !editedName.trim()}
-                          className="px-3 py-1.5 bg-white hover:bg-orange-500 text-black hover:text-white text-[9px] uppercase tracking-widest font-bold font-mono transition rounded-none cursor-pointer"
+                          className="px-3 py-1.5 bg-white hover:bg-red-700 text-black hover:text-white text-[9px] uppercase tracking-widest font-bold font-mono transition rounded-lg cursor-pointer flex-1"
                         >
                           {isSaving ? "Saving" : "Apply"}
                         </button>
@@ -187,7 +214,7 @@ export default function ImageDetailsModal({
                             setIsEditing(false);
                           }}
                           disabled={isSaving}
-                          className="px-3 py-1.5 bg-[#151515] border border-[#222] text-neutral-400 hover:text-white text-[9px] uppercase tracking-widest font-mono transition rounded-none cursor-pointer"
+                          className="px-3 py-1.5 bg-[#151515] border border-[#222] text-neutral-400 hover:text-white text-[9px] uppercase tracking-widest font-mono transition rounded-lg cursor-pointer flex-1"
                         >
                           Cancel
                         </button>
@@ -198,7 +225,7 @@ export default function ImageDetailsModal({
                       <h3 className="text-xl font-light font-serif text-white tracking-wide leading-tight break-all">{image.name}</h3>
                       <button
                         onClick={() => setIsEditing(true)}
-                        className="p-1 pt-0.5 text-neutral-500 hover:text-orange-500 transition-colors shrink-0 cursor-pointer"
+                        className="p-1 pt-0.5 text-neutral-500 hover:text-red-500 transition-colors shrink-0 cursor-pointer"
                         title="Rename record"
                       >
                         <Edit2 className="w-3.5 h-3.5" />
@@ -210,26 +237,106 @@ export default function ImageDetailsModal({
                   </p>
                 </div>
 
-                {/* Classification Tags */}
-                {image.tags && image.tags.length > 0 && (
-                  <div className="flex flex-col gap-2">
+                {/* Editable Classification Tags */}
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
                     <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest font-mono">Classifications</span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {image.tags.map(tag => (
-                        <button
-                          key={tag}
-                          onClick={() => {
-                            if (onTagClick) onTagClick(tag);
-                            onClose();
-                          }}
-                          className="text-[9px] uppercase tracking-widest bg-[#151515] hover:bg-orange-500 text-neutral-400 hover:text-white border border-[#222] px-2.5 py-1 rounded-none font-mono transition"
-                        >
-                          {tag}
-                        </button>
-                      ))}
-                    </div>
+                    {!isEditingTags && (
+                      <button
+                        onClick={() => setIsEditingTags(true)}
+                        className="text-[9px] text-neutral-500 hover:text-red-500 uppercase font-mono tracking-widest flex items-center gap-1 transition-colors"
+                      >
+                        <Edit2 className="w-3 h-3" /> Edit
+                      </button>
+                    )}
                   </div>
-                )}
+
+                  {isEditingTags ? (
+                    <div className="flex flex-col gap-3 p-3 bg-[#111] border border-white/5 rounded-xl">
+                      <div className="flex flex-wrap gap-1.5">
+                        {editedTags.map(tag => (
+                          <span key={tag} className="text-[9px] uppercase tracking-widest bg-red-900/20 text-red-400 border border-red-700/30 px-2 py-1 rounded-md font-mono flex items-center gap-1.5">
+                            {tag}
+                            <button onClick={() => setEditedTags(prev => prev.filter(t => t !== tag))} className="hover:text-white">
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ))}
+                        {editedTags.length === 0 && <span className="text-[9px] text-neutral-600 font-mono italic">No tags added.</span>}
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={customTagInput}
+                          onChange={(e) => setCustomTagInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              if (customTagInput.trim() && !editedTags.includes(customTagInput.trim())) {
+                                setEditedTags(prev => [...prev, customTagInput.trim()]);
+                                setCustomTagInput("");
+                              }
+                            }
+                          }}
+                          placeholder="Type new tag..."
+                          className="flex-1 bg-[#0A0A0A] border border-white/5 text-white text-[10px] px-3 py-2 rounded-lg focus:outline-none focus:border-red-800 font-mono"
+                        />
+                        <button
+                          onClick={() => {
+                            if (customTagInput.trim() && !editedTags.includes(customTagInput.trim())) {
+                                setEditedTags(prev => [...prev, customTagInput.trim()]);
+                                setCustomTagInput("");
+                            }
+                          }}
+                          className="bg-[#222] hover:bg-red-800 text-white px-3 rounded-lg text-[9px] font-bold uppercase tracking-widest transition-colors"
+                        >
+                          Add
+                        </button>
+                      </div>
+
+                      <div className="flex gap-2 mt-1">
+                        <button
+                          onClick={handleSaveTags}
+                          disabled={isSavingTags}
+                          className="flex-1 bg-white hover:bg-red-700 text-black hover:text-white transition-colors py-2 rounded-lg text-[9px] font-bold uppercase tracking-widest"
+                        >
+                          {isSavingTags ? "Saving..." : "Save Tags"}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditedTags(image.tags || []);
+                            setIsEditingTags(false);
+                            setCustomTagInput("");
+                          }}
+                          disabled={isSavingTags}
+                          className="flex-1 bg-[#151515] hover:bg-[#222] text-neutral-400 hover:text-white transition-colors py-2 rounded-lg text-[9px] font-bold uppercase tracking-widest border border-white/5"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {image.tags && image.tags.length > 0 ? (
+                        image.tags.map(tag => (
+                          <button
+                            key={tag}
+                            onClick={() => {
+                              if (onTagClick) onTagClick(tag);
+                              onClose();
+                            }}
+                            className="text-[9px] uppercase tracking-widest bg-[#111] hover:bg-red-800 text-neutral-400 hover:text-white border border-white/5 hover:border-red-700/50 px-2.5 py-1 rounded-lg font-mono transition-colors"
+                          >
+                            {tag}
+                          </button>
+                        ))
+                      ) : (
+                        <span className="text-[10px] text-neutral-600 font-mono italic">No tags added.</span>
+                      )}
+                    </div>
+                  )}
+                </div>
 
                 {/* File breakdown specs */}
                 <div className="border-t border-[#222] pt-4.5 flex flex-col gap-3">
@@ -237,7 +344,7 @@ export default function ImageDetailsModal({
                   
                   <div className="flex flex-col gap-3.5 text-xs text-neutral-300 font-mono">
                     <div className="flex items-center gap-3">
-                      <Calendar className="w-3.5 h-3.5 text-orange-500 flex-shrink-0" />
+                      <Calendar className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
                         <span className="text-neutral-500 block text-[9px] uppercase font-sans tracking-widest font-bold">Captured Date</span>
                         <span className="truncate text-xs font-sans text-neutral-300 block mt-0.5">{formatDate(image.createdAt)}</span>
@@ -245,7 +352,7 @@ export default function ImageDetailsModal({
                     </div>
 
                     <div className="flex items-center gap-3">
-                      <HardDrive className="w-3.5 h-3.5 text-orange-500 flex-shrink-0" />
+                      <HardDrive className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
                         <span className="text-neutral-500 block text-[9px] uppercase font-sans tracking-widest font-bold">Dimensions &amp; MIME</span>
                         <span className="truncate text-xs font-mono text-neutral-300 block mt-0.5">{formatFileSize(image.size)} • {image.contentType}</span>
@@ -253,14 +360,14 @@ export default function ImageDetailsModal({
                     </div>
 
                     <div className="flex items-start gap-3">
-                      <FolderGit className="w-3.5 h-3.5 text-orange-500 mt-1 flex-shrink-0" />
+                      <FolderGit className="w-3.5 h-3.5 text-red-500 mt-1 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
                         <span className="text-neutral-500 block text-[9px] uppercase font-sans tracking-widest font-bold font-semibold">Storage Path</span>
                         <div className="flex items-center gap-1.5 mt-1 font-mono">
-                          <span className="truncate bg-[#0A0A0A] p-2.5 px-3 border border-[#222] text-neutral-400 text-[10px] block font-mono flex-1 select-all">{image.path}</span>
+                          <span className="truncate bg-[#0A0A0A] p-2.5 px-3 border border-[#222] rounded-lg text-neutral-400 text-[10px] block font-mono flex-1 select-all">{image.path}</span>
                           <button
                             onClick={handleCopyPath}
-                            className="p-2.5 bg-[#151515] border border-[#222] hover:border-neutral-500 hover:bg-neutral-900 rounded-none text-neutral-350 hover:text-white transition flex-shrink-0"
+                            className="p-2.5 bg-[#151515] border border-[#222] hover:border-neutral-500 hover:bg-neutral-900 rounded-lg text-neutral-350 hover:text-white transition flex-shrink-0"
                             title="Copy Path"
                           >
                             {copiedPath ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
@@ -281,15 +388,15 @@ export default function ImageDetailsModal({
                     target="_blank"
                     rel="noreferrer"
                     download={image.name}
-                    className="flex items-center justify-center gap-2 bg-[#151515] hover:bg-neutral-900 text-neutral-300 hover:text-white p-3 rounded-none transition border border-[#222] text-[10px] uppercase font-bold tracking-widest font-sans"
+                    className="flex items-center justify-center gap-2 bg-[#151515] hover:bg-neutral-900 text-neutral-300 hover:text-white p-3 rounded-xl transition border border-[#222] text-[10px] uppercase font-bold tracking-widest font-sans"
                   >
-                    <Download className="w-3.5 h-3.5 text-orange-500" /> Download
+                    <Download className="w-3.5 h-3.5 text-red-500" /> Download
                   </a>
 
                   {/* Copy public url trigger */}
                   <button
                     onClick={handleCopyUrl}
-                    className="flex items-center justify-center gap-2 bg-[#151515] hover:bg-neutral-900 text-neutral-300 hover:text-white p-3 rounded-none transition border border-[#222] text-[10px] uppercase font-bold tracking-widest font-sans"
+                    className="flex items-center justify-center gap-2 bg-[#151515] hover:bg-neutral-900 text-neutral-300 hover:text-white p-3 rounded-xl transition border border-[#222] text-[10px] uppercase font-bold tracking-widest font-sans"
                   >
                     {copiedUrl ? (
                       <>
@@ -297,7 +404,7 @@ export default function ImageDetailsModal({
                       </>
                     ) : (
                       <>
-                        <Copy className="w-3.5 h-3.5 text-orange-500" /> Public URL
+                        <Copy className="w-3.5 h-3.5 text-red-500" /> Public URL
                       </>
                     )}
                   </button>
@@ -308,9 +415,9 @@ export default function ImageDetailsModal({
                   type="button"
                   onClick={handleDeleteClick}
                   disabled={isDeleting}
-                  className={`w-full p-3 rounded-none text-[10px] font-bold uppercase tracking-widest transition flex items-center justify-center gap-2 ${
+                  className={`w-full p-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition flex items-center justify-center gap-2 ${
                     confirmDelete 
-                      ? 'bg-red-650/10 text-red-400 border border-red-500/30' 
+                      ? 'bg-red-900/20 text-red-400 border border-red-500/30 shadow-[inset_0_0_15px_rgba(185,28,28,0.2)]' 
                       : 'bg-[#0A0A0A] hover:bg-[#1A0A0A] text-neutral-500 hover:text-red-400 border border-[#222]'
                   }`}
                 >
